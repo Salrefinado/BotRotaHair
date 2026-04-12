@@ -10,10 +10,12 @@ if not exist .env (
     exit
 )
 
-:: 2. Configuracao de Modo (Visivel ou Fantasma)
+:: 2. Configuracao de Modo e Tokens
 set "CMD_MODE=1"
+set "NGROK_AUTHTOKEN="
 for /f "usebackq tokens=1,2 delims==" %%A in (".env") do (
     if "%%A"=="CMD" set "CMD_MODE=%%B"
+    if "%%A"=="NGROK_AUTHTOKEN" set "NGROK_AUTHTOKEN=%%B"
 )
 
 echo ==========================================
@@ -21,11 +23,19 @@ echo    Iniciando o Sistema RotaHair...
 if "%CMD_MODE%"=="0" (
     echo    Modo: FANTASMA (Oculto)
 ) else (
-  
-  echo    Modo: JANELAS MINIMIZADAS
+    echo    Modo: JANELAS MINIMIZADAS
 )
 echo ==========================================
 echo.
+
+:: 3. Configurar Ngrok Authtoken
+if not "%NGROK_AUTHTOKEN%"=="" (
+    echo [Config] Autenticando Ngrok...
+    ngrok config add-authtoken %NGROK_AUTHTOKEN% > nul 2>&1
+) else (
+    echo [Aviso] NGROK_AUTHTOKEN nao encontrado no .env.
+)
+
 if "%CMD_MODE%"=="0" goto MODO_FANTASMA
 
 :MODO_NORMAL
