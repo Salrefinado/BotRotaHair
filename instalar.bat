@@ -6,13 +6,16 @@ color 0A
 ::   PREENCHA SEUS DADOS AQUI (so uma vez)
 :: ══════════════════════════════════════════════════
 
-set "NUMERO_DONO=5541999999999"
+set "NUMERO_DONO="
 set "NOME_DONO=Rodrigo"
-set "ANTHROPIC_KEY=sk-ant-SUACHAVE"
-set "ADMIN_EMAIL=SEU@EMAIL.COM"
-set "ADMIN_PASSWORD=SUASENHA"
-set "NGROK_DOMAIN=SEU-DOMINIO.ngrok-free.app"
-set "NGROK_AUTHTOKEN=SEU_TOKEN"
+set "NUMERO_TESTE="
+set "ANTHROPIC_KEY="
+set "GOOGLE_CLIENT_ID="
+set "GOOGLE_CLIENT_SECRET="
+set "ADMIN_EMAIL="
+set "ADMIN_PASSWORD="
+set "NGROK_DOMAIN="
+set "NGROK_AUTHTOKEN="
 
 :: ══════════════════════════════════════════════════
 ::   NAO MEXA ABAIXO DESTA LINHA
@@ -63,10 +66,10 @@ echo [2/6] Configurando credenciais...
 (
     echo NUMERO_DONO=%NUMERO_DONO%
     echo NOME_DONO=%NOME_DONO%
-    echo NUMERO_TESTE=
+    echo NUMERO_TESTE=%NUMERO_TESTE%
     echo ANTHROPIC_KEY=%ANTHROPIC_KEY%
-    echo GOOGLE_CLIENT_ID=
-    echo GOOGLE_CLIENT_SECRET=
+    echo GOOGLE_CLIENT_ID=%GOOGLE_CLIENT_ID%
+    echo GOOGLE_CLIENT_SECRET=%GOOGLE_CLIENT_SECRET%
     echo ADMIN_EMAIL=%ADMIN_EMAIL%
     echo ADMIN_PASSWORD=%ADMIN_PASSWORD%
     echo NGROK_DOMAIN=%NGROK_DOMAIN%
