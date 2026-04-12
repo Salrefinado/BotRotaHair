@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RotaHair</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <!-- ═══════════ LOGIN ═══════════ -->
+  <div id="screen-login" class="screen active">
+    <div class="login-wrapper">
+      <div class="login-brand">
+        <img src="static/logo.png" alt="RotaHair Logo" class="login-logo-img" />
+        <span class="login-logo-text">RotaHair</span>
+        <p class="login-tagline">Painel de Gestão</p>
+      </div>
+
+      <div class="login-form-block">
+        <h2 class="login-title">Entrar</h2>
+        <p class="login-sub">Acesse sua conta para continuar</p>
+
+        <div class="input-group">
+          <label>E-mail</label>
+          <div class="input-wrap">
+            <i data-lucide="mail" class="input-icon"></i>
+            <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label>Senha</label>
+          <div class="input-wrap">
+            <i data-lucide="lock" class="input-icon"></i>
+            <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+            <button class="input-toggle" onclick="togglePassword()" id="toggle-pw">
+              <i data-lucide="eye" id="eye-icon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button class="btn-primary w-full" onclick="doLogin()">Entrar</button>
+
+        <div class="login-divider"><span>ou continue com</span></div>
+
+        <div class="oauth-row">
+          <button class="btn-oauth" id="btn-google-login" onclick="initGoogleLogin()">
+            <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Google
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ APP ═══════════ -->
+  <div id="screen-app" class="screen">
+
+    <!-- ── BANNER: WhatsApp Desconectado ── -->
+    <div id="wpp-banner" class="wpp-banner hidden">
+      <div class="wpp-banner-top">
+        <div class="wpp-banner-left">
+          <i data-lucide="wifi-off" class="wpp-banner-icon"></i>
+          <div>
+            <p class="wpp-banner-title">WhatsApp desconectado</p>
+            <p class="wpp-banner-sub">Nenhuma mensagem está sendo respondida</p>
+          </div>
+        </div>
+        <button class="wpp-banner-toggle" id="wpp-banner-toggle" onclick="toggleQR()">
+          <i data-lucide="qr-code" id="wpp-qr-icon"></i>
+        </button>
+      </div>
+      <div id="wpp-qr-area" class="wpp-qr-area hidden">
+        <p class="wpp-qr-label">Escaneie com o WhatsApp para reconectar</p>
+        <div class="wpp-qr-wrap">
+          <img id="wpp-qr-img" src="" alt="QR Code WhatsApp" class="wpp-qr-img" />
+          <div id="wpp-qr-loading" class="wpp-qr-loading">
+            <span class="wpp-qr-spinner"></span>
+            <p>Aguardando QR Code...</p>
+          </div>
+        </div>
+        <p class="wpp-qr-hint">Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo</p>
+      </div>
+    </div>
+
+    <header class="app-header" id="app-header">
+      <div class="header-inner">
+        <div class="header-brand">
+          <img src="static/logo.png" alt="RotaHair Logo" class="brand-logo-img" />
+          <span class="brand-name">RotaHair</span>
+        </div>
+        <div class="header-status" id="header-status-dot">
+          <span class="status-dot" id="status-dot"></span>
+          <span class="status-label" id="status-label">–</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main" id="app-main">
+
+      <!-- ── HOME ── -->
+      <section id="tab-home" class="tab-pane active">
+        <div class="home-greeting-block">
+          <p class="greeting-time" id="greeting-text">Bom dia</p>
+          <h1 class="greeting-name">Rodrigo <span class="greeting-wave">✦</span></h1>
+          <p class="greeting-question">Qual o status da barbearia agora?</p>
+        </div>
+
+        <div class="home-actions">
+          <button class="action-card" id="btn-abrir" onclick="setStatus('ABERTO')">
+            <div class="action-card-icon"><i data-lucide="store"></i></div>
+            <div class="action-card-text">
+              <span class="action-label">Abri a barbearia</span>
+              <span class="action-desc">Barbearia disponível para clientes</span>
+            </div>
+            <i data-lucide="chevron-right" class="action-arrow"></i>
+          </button>
+
+          <button class="action-card" id="btn-almoco" onclick="openAlmocoModal()">
+            <div class="action-card-icon"><i data-lucide="utensils"></i></div>
+            <div class="action-card-text">
+              <span class="action-label">Saí para o almoço</span>
+              <span class="action-desc">Definir previsão de retorno</span>
+            </div>
+            <i data-lucide="chevron-right" class="action-arrow"></i>
+          </button>
+
+          <button class="action-card" id="btn-voltei" onclick="setStatus('RETORNOU')">
+            <div class="action-card-icon"><i data-lucide="coffee"></i></div>
+            <div class="action-card-text">
+              <span class="action-label">Voltei do almoço</span>
+              <span class="action-desc">Pronto para receber clientes</span>
+            </div>
+            <i data-lucide="chevron-right" class="action-arrow"></i>
+          </button>
+
+          <button class="action-card" id="btn-fechar" onclick="setStatus('FECHADO')">
+            <div class="action-card-icon"><i data-lucide="moon"></i></div>
+            <div class="action-card-text">
+              <span class="action-label">Fechei a barbearia</span>
+              <span class="action-desc">Encerrar atendimento do dia</span>
+            </div>
+            <i data-lucide="chevron-right" class="action-arrow"></i>
+          </button>
+        </div>
+
+        <div class="home-status-bar" id="home-status-bar">
+          <div id="status-history-list"></div>
+        </div>
+      </section>
+
+      <!-- ── AGENDA ── -->
+      <section id="tab-agenda" class="tab-pane">
+        <div class="agenda-header-block">
+          <div class="agenda-date-info">
+            <h2 class="agenda-today-label" id="agenda-today-label">–</h2>
+            <p class="agenda-today-date" id="agenda-today-date">–</p>
+          </div>
+          <div class="agenda-status-badge" id="agenda-status-badge">
+            <span class="badge-dot"></span>
+            <span id="agenda-badge-text">–</span>
+          </div>
+        </div>
+        <div class="agenda-list" id="agenda-list"></div>
+      </section>
+
+      <!-- ── SERVIÇOS ── -->
+      <section id="tab-servicos" class="tab-pane">
+        <div class="list-header">
+          <h2 class="list-title">Serviços</h2>
+          <button class="btn-new" onclick="openServicoModal()">
+            <i data-lucide="plus"></i> Novo Serviço
+          </button>
+        </div>
+        <div class="items-list" id="servicos-list"></div>
+        <div class="list-empty" id="servicos-empty">
+          <i data-lucide="scissors"></i>
+          <p>Nenhum serviço cadastrado</p>
+          <span>Clique em "Novo Serviço" para começar</span>
+        </div>
+      </section>
+
+      <!-- ── PLANOS ── -->
+      <section id="tab-planos" class="tab-pane">
+        <div class="list-header">
+          <h2 class="list-title">Planos</h2>
+          <button class="btn-new" onclick="openPlanoModal()">
+            <i data-lucide="plus"></i> Novo Plano
+          </button>
+        </div>
+        <div class="items-list" id="planos-list"></div>
+        <div class="list-empty" id="planos-empty">
+          <i data-lucide="gem"></i>
+          <p>Nenhum plano cadastrado</p>
+          <span>Clique em "Novo Plano" para começar</span>
+        </div>
+      </section>
+
+      <!-- ── ACESSOS ── -->
+      <section id="tab-acessos" class="tab-pane">
+
+        <div class="acessos-section">
+          <h3 class="acessos-section-title">Mensagens Respondidas</h3>
+          <div class="metrics-row">
+            <div class="metric-card">
+              <span class="metric-value" id="msg-hoje">–</span>
+              <span class="metric-label">Hoje</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-value" id="msg-semana">–</span>
+              <span class="metric-label">7 dias</span>
+            </div>
+            <div class="metric-card">
+              <span class="metric-value" id="msg-mes">–</span>
+              <span class="metric-label">30 dias</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="acessos-section">
+          <h3 class="acessos-section-title">Status do Bot</h3>
+          <div class="bot-status-card" id="bot-status-card">
+            <div class="bot-status-left">
+              <i data-lucide="message-circle" class="bot-icon"></i>
+              <div>
+                <p class="bot-label">WhatsApp Bot</p>
+                <p class="bot-sub" id="bot-status-sub">Verificando conexão...</p>
+              </div>
+            </div>
+            <div id="bot-status-indicator">
+              <div class="bot-online" id="bot-online-badge">
+                <span class="online-dot"></span>
+                <span>Online</span>
+              </div>
+              <div class="bot-offline" id="bot-offline-badge" style="display:none">
+                <span class="offline-dot"></span>
+                <span>Offline</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="acessos-section">
+          <h3 class="acessos-section-title">Sobre o Sistema</h3>
+          <div class="about-card">
+            <div class="about-row">
+              <i data-lucide="info" class="about-icon"></i>
+              <div>
+                <p class="about-label">RotaHair v1.0</p>
+                <p class="about-sub">Bot WhatsApp + Painel de Gestão</p>
+              </div>
+            </div>
+            <div class="about-row">
+              <i data-lucide="cpu" class="about-icon"></i>
+              <div>
+                <p class="about-label">MantisSystem</p>
+                <p class="about-sub">Infraestrutura e automação</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-item" data-tab="servicos" onclick="switchTab('servicos')">
+        <i data-lucide="scissors"></i>
+        <span>Serviços</span>
+      </button>
+      <button class="nav-item" data-tab="agenda" onclick="switchTab('agenda')">
+        <i data-lucide="calendar"></i>
+        <span>Agenda</span>
+      </button>
+      <button class="nav-item nav-home" data-tab="home" onclick="switchTab('home')">
+        <div class="nav-home-inner">
+          <i data-lucide="home"></i>
+        </div>
+      </button>
+      <button class="nav-item" data-tab="planos" onclick="switchTab('planos')">
+        <i data-lucide="gem"></i>
+        <span>Planos</span>
+      </button>
+      <button class="nav-item" data-tab="acessos" onclick="switchTab('acessos')">
+        <i data-lucide="bar-chart-2"></i>
+        <span>Acessos</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ═══════════ MODALS ═══════════ -->
+  <div id="modal-almoco" class="modal-overlay" onclick="closeModal('modal-almoco')">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <i data-lucide="utensils" class="modal-icon"></i>
+        <h3>Bom apetite! 🍽️</h3>
+        <p>Pretende voltar que horas?</p>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>Previsão de retorno</label>
+          <div class="input-wrap">
+            <i data-lucide="clock" class="input-icon"></i>
+            <input type="time" id="almoco-retorno" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="closeModal('modal-almoco')">Cancelar</button>
+        <button class="btn-primary" onclick="confirmarAlmoco()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-servico" class="modal-overlay" onclick="closeModal('modal-servico')">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <i data-lucide="scissors" class="modal-icon"></i>
+        <h3 id="servico-modal-title">Novo Serviço</h3>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>Nome do Serviço</label>
+          <div class="input-wrap">
+            <input type="text" id="servico-nome" placeholder="Ex: Corte masculino" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Valor (R$)</label>
+          <div class="input-wrap">
+            <i data-lucide="banknote" class="input-icon"></i>
+            <input type="number" id="servico-valor" placeholder="0,00" step="0.01" min="0" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Descrição</label>
+          <textarea id="servico-desc" placeholder="Descreva o serviço..." rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="closeModal('modal-servico')">Cancelar</button>
+        <button class="btn-primary" onclick="salvarServico()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-plano" class="modal-overlay" onclick="closeModal('modal-plano')">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <i data-lucide="gem" class="modal-icon"></i>
+        <h3 id="plano-modal-title">Novo Plano</h3>
+      </div>
+      <div class="modal-body">
+        <div class="input-group">
+          <label>Nome do Plano</label>
+          <div class="input-wrap">
+            <input type="text" id="plano-nome" placeholder="Ex: Plano Mensal Premium" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Valor (R$)</label>
+          <div class="input-wrap">
+            <i data-lucide="banknote" class="input-icon"></i>
+            <input type="number" id="plano-valor" placeholder="0,00" step="0.01" min="0" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Descrição Curta</label>
+          <div class="input-wrap">
+            <input type="text" id="plano-desc-curta" placeholder="Ex: 2 Cortes + 2 Barbas" />
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Detalhes do Plano</label>
+          <textarea id="plano-detalhes" placeholder="Todo mês você tem direito a..." rows="4"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="closeModal('modal-plano')">Cancelar</button>
+        <button class="btn-primary" onclick="salvarPlano()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-confirm" class="modal-overlay" onclick="closeModal('modal-confirm')">
+    <div class="modal-sheet modal-sheet--sm" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <i data-lucide="trash-2" class="modal-icon modal-icon--danger"></i>
+        <h3 id="confirm-title">Excluir item?</h3>
+        <p id="confirm-msg">Esta ação não pode ser desfeita.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+        <button class="btn-danger" id="confirm-btn">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-agenda" class="modal-overlay" onclick="closeModal('modal-agenda')">
+    <div class="modal-sheet" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+
+      <div class="wizard-steps" id="wizard-steps">
+        <div class="wizard-step active" data-step="1"></div>
+        <div class="wizard-step" data-step="2"></div>
+        <div class="wizard-step" data-step="3"></div>
+        <div class="wizard-step" data-step="4"></div>
+      </div>
+
+      <div id="wizard-step-1" class="wizard-pane active">
+        <div class="modal-header">
+          <i data-lucide="sunrise" class="modal-icon"></i>
+          <h3>Que horas vai chegar?</h3>
+          <p id="wizard-day-label-1">–</p>
+        </div>
+        <div class="modal-body">
+          <div class="input-group">
+            <div class="input-wrap">
+              <i data-lucide="clock" class="input-icon"></i>
+              <input type="time" id="w-abertura" oninput="onAberturaInput()" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" id="btn-nao-abrir" onclick="confirmNaoAbrir()">Não vou abrir</button>
+          <button class="btn-primary" id="btn-confirm-abertura" onclick="wizardNext(1)" style="display:none">Confirmar</button>
+        </div>
+      </div>
+
+      <div id="wizard-step-2" class="wizard-pane">
+        <div class="modal-header">
+          <i data-lucide="utensils" class="modal-icon"></i>
+          <h3>Que horas vai almoçar?</h3>
+          <p id="wizard-day-label-2">–</p>
+        </div>
+        <div class="modal-body">
+          <div class="input-group">
+            <div class="input-wrap">
+              <i data-lucide="clock" class="input-icon"></i>
+              <input type="time" id="w-almoco" oninput="onAlmocoInput()" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" id="btn-sem-almoco" onclick="wizardSemAlmoco()">Não vou almoçar</button>
+          <button class="btn-primary" id="btn-confirm-almoco" onclick="wizardNext(2)" style="display:none">Confirmar</button>
+        </div>
+      </div>
+
+      <div id="wizard-step-3" class="wizard-pane">
+        <div class="modal-header">
+          <i data-lucide="coffee" class="modal-icon"></i>
+          <h3>Que horas vai retornar?</h3>
+          <p id="wizard-day-label-3">–</p>
+        </div>
+        <div class="modal-body">
+          <div class="input-group">
+            <div class="input-wrap">
+              <i data-lucide="clock" class="input-icon"></i>
+              <input type="time" id="w-retorno" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" onclick="wizardBack(3)">Voltar</button>
+          <button class="btn-primary" onclick="wizardNext(3)">Confirmar</button>
+        </div>
+      </div>
+
+      <div id="wizard-step-4" class="wizard-pane">
+        <div class="modal-header">
+          <i data-lucide="moon" class="modal-icon"></i>
+          <h3>Horário de encerramento?</h3>
+          <p id="wizard-day-label-4">–</p>
+        </div>
+        <div class="modal-body">
+          <div class="input-group">
+            <div class="input-wrap">
+              <i data-lucide="clock" class="input-icon"></i>
+              <input type="time" id="w-fechamento" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-ghost" onclick="wizardBack(4)">Voltar</button>
+          <button class="btn-primary" onclick="wizardFinish()">Confirmar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="modal-nao-abrir" class="modal-overlay" onclick="closeModal('modal-nao-abrir')">
+    <div class="modal-sheet modal-sheet--sm" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <i data-lucide="store" class="modal-icon"></i>
+        <h3>Fechar o dia?</h3>
+        <p id="nao-abrir-msg">Deseja considerar que neste dia não irá abrir a Barbearia?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" onclick="closeModal('modal-nao-abrir')">Cancelar</button>
+        <button class="btn-primary" onclick="confirmarNaoAbrir()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
