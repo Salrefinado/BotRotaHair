@@ -2,78 +2,167 @@
 title RotaHair - Instalador
 color 0A
 
+:: ══════════════════════════════════════════════════
+::   PREENCHA SEUS DADOS AQUI (so uma vez)
+:: ══════════════════════════════════════════════════
+
+set "NUMERO_DONO=5541999999999"
+set "NOME_DONO=Rodrigo"
+set "ANTHROPIC_KEY=sk-ant-SUACHAVE"
+set "ADMIN_EMAIL=SEU@EMAIL.COM"
+set "ADMIN_PASSWORD=SUASENHA"
+set "NGROK_DOMAIN=SEU-DOMINIO.ngrok-free.app"
+set "NGROK_AUTHTOKEN=SEU_TOKEN"
+
+:: ══════════════════════════════════════════════════
+::   NAO MEXA ABAIXO DESTA LINHA
+:: ══════════════════════════════════════════════════
+
+echo.
 echo ==========================================
 echo    Instalador do Sistema RotaHair
 echo ==========================================
 echo.
-echo [1/5] Verificando programas base (Python, Node.js, Ngrok)...
+
+:: ── Verifica conexao com internet ─────────────────
+ping -n 1 github.com >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERRO] Sem conexao com a internet!
+    echo Conecte-se e tente novamente.
+    pause
+    exit /b 1
+)
+
+:: ── Baixa o projeto do GitHub ─────────────────────
+echo [1/6] Baixando RotaHair do GitHub...
+
+cd /d "%USERPROFILE%\Documents"
+
+if exist BotRotaHair-main (
+    echo     Removendo versao anterior...
+    rmdir /s /q BotRotaHair-main > nul 2>&1
+)
+if exist rotahair.zip del /q rotahair.zip > nul 2>&1
+
+curl -L --progress-bar -o rotahair.zip https://github.com/Salrefinado/BotRotaHair/archive/refs/heads/main.zip
+if %errorlevel% neq 0 (
+    echo [ERRO] Falha ao baixar o projeto. Verifique sua conexao.
+    pause
+    exit /b 1
+)
+
+tar -xf rotahair.zip
+del /q rotahair.zip
+cd BotRotaHair-main
+
+echo [OK] Projeto baixado em: %CD%
+
+:: ── Cria o .env ───────────────────────────────────
+echo.
+echo [2/6] Configurando credenciais...
+(
+    echo NUMERO_DONO=%NUMERO_DONO%
+    echo NOME_DONO=%NOME_DONO%
+    echo NUMERO_TESTE=
+    echo ANTHROPIC_KEY=%ANTHROPIC_KEY%
+    echo GOOGLE_CLIENT_ID=
+    echo GOOGLE_CLIENT_SECRET=
+    echo ADMIN_EMAIL=%ADMIN_EMAIL%
+    echo ADMIN_PASSWORD=%ADMIN_PASSWORD%
+    echo NGROK_DOMAIN=%NGROK_DOMAIN%
+    echo NGROK_AUTHTOKEN=%NGROK_AUTHTOKEN%
+    echo API_PORT=8000
+    echo API_BASE_URL=http://localhost:8000
+    echo TZ=America/Sao_Paulo
+    echo CMD=1
+) > .env
+echo [OK] Arquivo .env criado.
+
+:: ── Instala dependencias base ─────────────────────
+echo.
+echo [3/6] Verificando programas base (Python, Node.js, Ngrok)...
 
 where python >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Instalando Python...
+    echo     Instalando Python...
     winget install --id Python.Python.3.13 -e --source winget --accept-package-agreements --accept-source-agreements
 ) else (
-    echo [OK] Python ja esta instalado.
+    echo     [OK] Python ja esta instalado.
 )
 
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Instalando Node.js...
+    echo     Instalando Node.js...
     winget install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements
 ) else (
-    echo [OK] Node.js ja esta instalado.
+    echo     [OK] Node.js ja esta instalado.
 )
 
 where ngrok >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Instalando Ngrok...
+    echo     Instalando Ngrok...
     winget install --id ngrok.ngrok -e --source winget --accept-package-agreements --accept-source-agreements
 ) else (
-    echo [OK] Ngrok ja esta instalado.
+    echo     [OK] Ngrok ja esta instalado.
 )
 
+:: ── Ambiente Python ───────────────────────────────
 echo.
-echo [2/5] Configurando ambiente Python (venv)...
+echo [4/6] Configurando ambiente Python...
 if not exist venv (
     python -m venv venv
 )
 call venv\Scripts\activate
 pip install -q -r requirements.txt
+echo [OK] Dependencias Python instaladas.
 
+:: ── Dependencias Node ─────────────────────────────
 echo.
-echo [3/5] Instalando dependencias do Node.js...
+echo [5/6] Instalando dependencias Node.js...
 if not exist node_modules (
-    call npm install
+    call npm install --silent
 )
+echo [OK] Dependencias Node instaladas.
+
+:: ── Atalhos na Area de Trabalho ───────────────────
+echo.
+echo [6/6] Criando atalhos e autenticando Ngrok...
+for /f "delims=" %%i in ('powershell -NoProfile -Command "[Environment]::GetFolderPath(\"Desktop\")"') do set "DESK=%%i"
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Iniciar.lnk');$s.TargetPath='%CD%\iniciar.bat';$s.WorkingDirectory='%CD%';$s.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Desligar.lnk');$s.TargetPath='%CD%\desligar.bat';$s.WorkingDirectory='%CD%';$s.Save()"
+
+ngrok config add-authtoken %NGROK_AUTHTOKEN% > nul 2>&1
+echo [OK] Atalhos criados. Ngrok autenticado.
+
+:: ── Inicia o sistema ──────────────────────────────
+echo.
+echo ==========================================
+echo    Instalacao concluida! Iniciando...
+echo ==========================================
+echo.
+
+echo Iniciando API Python (minimizado)...
+start "RotaHair - API" /min cmd /k "call "%CD%\venv\Scripts\activate" && python "%CD%\api.py""
+timeout /t 4 /nobreak > nul
+
+echo Iniciando Bot WhatsApp...
+start "RotaHair - Bot | QR Code aqui" cmd /k "cd /d "%CD%" && node bot.js"
+timeout /t 2 /nobreak > nul
+
+echo Iniciando tunel Ngrok (minimizado)...
+start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=%NGROK_DOMAIN% 8000"
+timeout /t 4 /nobreak > nul
+
+echo Abrindo painel web...
+start http://localhost:8000
 
 echo.
-echo [4/5] Criando atalhos na Area de Trabalho...
-for /f "delims=" %%i in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('Desktop')"') do set "DESKTOP_PATH=%%i"
-set "SC_INICIAR=%DESKTOP_PATH%\RotaHair - Iniciar.lnk"
-set "SC_DESLIGAR=%DESKTOP_PATH%\RotaHair - Desligar.lnk"
-
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut(\"%SC_INICIAR%\");$s.TargetPath='%~dp0iniciar.bat';$s.WorkingDirectory='%~dp0';$s.Save()"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut(\"%SC_DESLIGAR%\");$s.TargetPath='%~dp0desligar.bat';$s.WorkingDirectory='%~dp0';$s.Save()"
-
+echo ==========================================
+echo Tudo pronto!
+echo Escaneie o QR Code na janela "RotaHair - Bot".
+echo Da proxima vez use o atalho na Area de Trabalho.
+echo ==========================================
 echo.
-echo [5/5] Configurando arquivo .env...
-if not exist .env (
-    echo NUMERO_DONO=> .env
-    echo NOME_DONO=Rodrigo>> .env
-    echo NUMERO_TESTE=>> .env
-    echo ANTHROPIC_KEY=>> .env
-    echo NGROK_DOMAIN=>> .env
-    echo NGROK_AUTHTOKEN=>> .env
-    echo CMD=1>> .env
-    echo Arquivo .env criado com sucesso.
-)
-
-echo ==========================================
-echo Instalacao concluida!
-echo O arquivo .env sera aberto agora.
-echo Preencha suas informacoes, salve e feche o bloco de notas.
-echo Depois, basta usar o atalho "RotaHair - Iniciar" na Area de Trabalho.
-echo ==========================================
-pause
-notepad .env
+timeout /t 8 /nobreak > nul
 exit
