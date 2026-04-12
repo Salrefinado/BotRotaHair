@@ -74,15 +74,18 @@ if not exist node_modules (
 )
 echo     [OK] Dependencias Node instaladas.
 
-:: ── 4. Atalhos na Area de Trabalho ───────────────────
+:: ── 4. Atalhos na Area de Trabalho com Ícones Personalizados ────
 echo.
-echo [4/5] Criando atalhos na Area de Trabalho...
+echo [4/5] Criando atalhos personalizados na Area de Trabalho...
 for /f "delims=" %%i in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('Desktop')"') do set "DESK=%%i"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Iniciar.lnk');$s.TargetPath='%~dp0iniciar.bat';$s.WorkingDirectory='%~dp0';$s.Save()"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Desligar.lnk');$s.TargetPath='%~dp0desligar.bat';$s.WorkingDirectory='%~dp0';$s.Save()"
-echo     [OK] Atalhos criados.
+:: Atalho para INICIAR (Utiliza a sua logo.ico)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Iniciar.lnk');$s.TargetPath='%~dp0iniciar.bat';$s.WorkingDirectory='%~dp0';$s.IconLocation='%~dp0logo.ico';$s.Save()"
 
+:: Atalho para DESLIGAR (Utiliza o ícone de "X" do Windows)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Desligar.lnk');$s.TargetPath='%~dp0desligar.bat';$s.WorkingDirectory='%~dp0';$s.IconLocation='shell32.dll, 131';$s.Save()"
+
+echo     [OK] Atalhos configurados (Logo para Iniciar / X para Desligar).
 :: ── 5. Autentica Ngrok ────────────────────────────────
 echo.
 echo [5/5] Autenticando Ngrok...
