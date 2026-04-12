@@ -21,24 +21,24 @@ echo    Iniciando o Sistema RotaHair...
 if "%CMD_MODE%"=="0" (
     echo    Modo: FANTASMA (Oculto)
 ) else (
-    echo    Modo: JANELAS MINIMIZADAS
+  
+  echo    Modo: JANELAS MINIMIZADAS
 )
 echo ==========================================
 echo.
-
 if "%CMD_MODE%"=="0" goto MODO_FANTASMA
 
 :MODO_NORMAL
 echo [1/3] Iniciando a API Python (Minimizado)...
-start "RotaHair - API Python" /min cmd /c "call venv\Scripts\activate && python api.py"
+start "RotaHair - API Python" /min cmd /k "call venv\Scripts\activate && python api.py"
 timeout /t 3 /nobreak > nul
 
 echo [2/3] Iniciando o Bot do WhatsApp (Minimizado)...
-start "RotaHair - Bot WhatsApp" /min cmd /c "node bot.js"
+start "RotaHair - Bot WhatsApp" /min cmd /k "node bot.js"
 timeout /t 2 /nobreak > nul
 
 echo [3/3] Iniciando o Tunel Ngrok (Minimizado)...
-start "RotaHair - Ngrok" /min cmd /c "ngrok http --domain=kam-breezelike-carmelia.ngrok-free.dev 8000"
+start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=kam-breezelike-carmelia.ngrok-free.dev 8000"
 
 echo.
 echo ==========================================
