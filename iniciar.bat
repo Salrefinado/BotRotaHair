@@ -1,91 +1,130 @@
 @echo off
-title RotaHair - Inicializador
+title RotaHair - Instalacao e Inicio Automatico
 color 0A
 
-:: 1. Verificacao do Arquivo .env
+:: ─────────────────────────────────────────────────────
+:: Este arquivo e chamado pelo comando unico de setup.
+:: Nao e necessario editar nada aqui.
+:: ─────────────────────────────────────────────────────
+
 if not exist .env (
+    echo.
     echo [ERRO] Arquivo .env nao encontrado!
-    echo Por favor, execute o 'instalar.bat' primeiro ou crie o arquivo .env com suas chaves antes de iniciar.
+    echo Execute o comando de setup completo antes deste arquivo.
     pause
-    exit
+    exit /b 1
 )
 
-:: 2. Configuracao de Modo e Tokens
-set "CMD_MODE=1"
-set "NGROK_AUTHTOKEN="
+echo.
+echo ==========================================
+echo    RotaHair - Instalacao Automatica
+echo ==========================================
+echo.
+
+:: ── Lê variaveis do .env ──────────────────────────────
+set "NGROK_AUTHTOKEN_VAL="
+set "NGROK_DOMAIN_VAL="
 for /f "usebackq tokens=1,2 delims==" %%A in (".env") do (
-    if "%%A"=="CMD" set "CMD_MODE=%%B"
-    if "%%A"=="NGROK_AUTHTOKEN" set "NGROK_AUTHTOKEN=%%B"
+    if /i "%%A"=="NGROK_AUTHTOKEN" set "NGROK_AUTHTOKEN_VAL=%%B"
+    if /i "%%A"=="NGROK_DOMAIN"    set "NGROK_DOMAIN_VAL=%%B"
 )
 
-echo ==========================================
-echo    Iniciando o Sistema RotaHair...
-if "%CMD_MODE%"=="0" (
-    echo    Modo: FANTASMA (Oculto)
+:: ── 1. Dependencias base ──────────────────────────────
+echo [1/5] Verificando Python, Node.js e Ngrok...
+
+where python >nul 2>&1
+if %errorlevel% neq 0 (
+    echo     Instalando Python...
+    winget install --id Python.Python.3.13 -e --source winget --accept-package-agreements --accept-source-agreements
 ) else (
-    echo    Modo: JANELAS MINIMIZADAS
+    echo     [OK] Python ja instalado.
 )
+
+where node >nul 2>&1
+if %errorlevel% neq 0 (
+    echo     Instalando Node.js...
+    winget install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements
+) else (
+    echo     [OK] Node.js ja instalado.
+)
+
+where ngrok >nul 2>&1
+if %errorlevel% neq 0 (
+    echo     Instalando Ngrok...
+    winget install --id ngrok.ngrok -e --source winget --accept-package-agreements --accept-source-agreements
+) else (
+    echo     [OK] Ngrok ja instalado.
+)
+
+:: ── 2. Ambiente Python ────────────────────────────────
+echo.
+echo [2/5] Configurando ambiente Python...
+if not exist venv (
+    python -m venv venv
+)
+call venv\Scripts\activate
+pip install -q -r requirements.txt
+echo     [OK] Dependencias Python instaladas.
+
+:: ── 3. Dependencias Node ──────────────────────────────
+echo.
+echo [3/5] Instalando dependencias Node.js...
+if not exist node_modules (
+    call npm install --silent
+)
+echo     [OK] Dependencias Node instaladas.
+
+:: ── 4. Atalhos na Area de Trabalho ───────────────────
+echo.
+echo [4/5] Criando atalhos na Area de Trabalho...
+for /f "delims=" %%i in ('powershell -NoProfile -Command "[Environment]::GetFolderPath('Desktop')"') do set "DESK=%%i"
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Iniciar.lnk');$s.TargetPath='%~dp0iniciar.bat';$s.WorkingDirectory='%~dp0';$s.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Desligar.lnk');$s.TargetPath='%~dp0desligar.bat';$s.WorkingDirectory='%~dp0';$s.Save()"
+echo     [OK] Atalhos criados.
+
+:: ── 5. Autentica Ngrok ────────────────────────────────
+echo.
+echo [5/5] Autenticando Ngrok...
+if not "%NGROK_AUTHTOKEN_VAL%"=="" (
+    ngrok config add-authtoken %NGROK_AUTHTOKEN_VAL% > nul 2>&1
+    echo     [OK] Ngrok autenticado.
+) else (
+    echo     [AVISO] NGROK_AUTHTOKEN nao encontrado no .env.
+)
+
+:: ── Inicia o sistema ──────────────────────────────────
+echo.
+echo ==========================================
+echo    Iniciando o sistema...
 echo ==========================================
 echo.
 
-:: 3. Configurar Ngrok Authtoken
-if not "%NGROK_AUTHTOKEN%"=="" (
-    echo [Config] Autenticando Ngrok...
-    ngrok config add-authtoken %NGROK_AUTHTOKEN% > nul 2>&1
-) else (
-    echo [Aviso] NGROK_AUTHTOKEN nao encontrado no .env.
-)
+echo Iniciando API Python (minimizado)...
+start "RotaHair - API" /min cmd /k "call "%~dp0venv\Scripts\activate" && python "%~dp0api.py""
+timeout /t 4 /nobreak > nul
 
-if "%CMD_MODE%"=="0" goto MODO_FANTASMA
-
-:MODO_NORMAL
-echo [1/3] Iniciando a API Python (Minimizado)...
-start "RotaHair - API Python" /min cmd /k "call venv\Scripts\activate && python api.py"
-timeout /t 3 /nobreak > nul
-
-echo [2/3] Iniciando o Bot do WhatsApp (Minimizado)...
-start "RotaHair - Bot WhatsApp" /min cmd /k "node bot.js"
+echo Iniciando Bot WhatsApp (aguarde o QR Code)...
+start "RotaHair - Bot | QR Code aqui" cmd /k "cd /d "%~dp0" && node bot.js"
 timeout /t 2 /nobreak > nul
 
-echo [3/3] Iniciando o Tunel Ngrok (Minimizado)...
-start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=kam-breezelike-carmelia.ngrok-free.dev 8000"
+echo Iniciando tunel Ngrok (minimizado)...
+if not "%NGROK_DOMAIN_VAL%"=="" (
+    start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=%NGROK_DOMAIN_VAL% 8000"
+) else (
+    start "RotaHair - Ngrok" /min cmd /k "ngrok http 8000"
+)
+
+:: ── Abre o painel no browser ──────────────────────────
+timeout /t 4 /nobreak > nul
+echo Abrindo painel web...
+start http://localhost:8000
 
 echo.
 echo ==========================================
-echo Tudo iniciado com sucesso!
+echo Tudo pronto! Escaneie o QR Code que
+echo apareceu na janela "RotaHair - Bot".
+echo O painel web tambem abriu no navegador.
 echo ==========================================
-echo.
-goto FIM
-
-:MODO_FANTASMA
-echo [1/3] Iniciando a API Python em segundo plano...
-echo Set WshShell = CreateObject("WScript.Shell") > run_api.vbs
-echo WshShell.Run "cmd /c call venv\Scripts\activate && python api.py", 0, False >> run_api.vbs
-cscript //nologo run_api.vbs
-del run_api.vbs
-timeout /t 3 /nobreak > nul
-
-echo [2/3] Iniciando o Bot do WhatsApp em segundo plano...
-echo Set WshShell = CreateObject("WScript.Shell") > run_bot.vbs
-echo WshShell.Run "cmd /c node bot.js", 0, False >> run_bot.vbs
-cscript //nologo run_bot.vbs
-del run_bot.vbs
-timeout /t 2 /nobreak > nul
-
-echo [3/3] Iniciando o Tunel Ngrok em segundo plano...
-echo Set WshShell = CreateObject("WScript.Shell") > run_ngrok.vbs
-echo WshShell.Run "cmd /c ngrok http --domain=kam-breezelike-carmelia.ngrok-free.dev 8000", 0, False >> run_ngrok.vbs
-cscript //nologo run_ngrok.vbs
-del run_ngrok.vbs
-
-echo.
-echo ==========================================
-echo Tudo iniciado com sucesso no MODO FANTASMA!
-echo ==========================================
-echo.
-echo Utilize o 'desligar.bat' para parar o sistema.
-
-:FIM
-echo Esta janela fechara sozinha em 5 segundos...
 timeout /t 5 /nobreak > nul
 exit
