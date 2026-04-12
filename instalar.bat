@@ -6,11 +6,31 @@ echo ==========================================
 echo    Instalador do Sistema RotaHair
 echo ==========================================
 echo.
+echo [1/5] Verificando programas base (Python, Node.js, Ngrok)...
 
-echo [1/5] Instalando programas base (Python, Node.js, Ngrok)...
-winget install --id Python.Python.3.13 -e --source winget --accept-package-agreements --accept-source-agreements
-winget install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements
-winget install --id ngrok.ngrok -e --source winget --accept-package-agreements --accept-source-agreements
+where python >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Instalando Python...
+    winget install --id Python.Python.3.13 -e --source winget --accept-package-agreements --accept-source-agreements
+) else (
+    echo [OK] Python ja esta instalado.
+)
+
+where node >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Instalando Node.js...
+    winget install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements
+) else (
+    echo [OK] Node.js ja esta instalado.
+)
+
+where ngrok >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Instalando Ngrok...
+    winget install --id ngrok.ngrok -e --source winget --accept-package-agreements --accept-source-agreements
+) else (
+    echo [OK] Ngrok ja esta instalado.
+)
 
 echo.
 echo [2/5] Configurando ambiente Python (venv)...
@@ -42,6 +62,8 @@ if not exist .env (
     echo NOME_DONO=Rodrigo>> .env
     echo NUMERO_TESTE=>> .env
     echo ANTHROPIC_KEY=>> .env
+    echo NGROK_DOMAIN=>> .env
+    echo NGROK_AUTHTOKEN=>> .env
     echo CMD=1>> .env
     echo Arquivo .env criado com sucesso.
 )
