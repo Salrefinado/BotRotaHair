@@ -5,6 +5,7 @@ FastAPI · SQLite · Serve frontend estático
 
 import os
 import json
+import base64
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -63,6 +64,10 @@ class StatusIn(BaseModel):
 class GoogleAuthIn(BaseModel):
     credential: str
 
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
 class WhatsAppQRIn(BaseModel):
     qr: str              # base64 data URL da imagem do QR
 
@@ -83,12 +88,50 @@ def get_config():
         "google_client_id": os.getenv("GOOGLE_CLIENT_ID", "")
     }
 
+def decode_jwt_payload(token: str) -> dict:
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return {}
+            
+        payload = parts[1]
+        payload += "=" * ((4 - len(payload) % 4) % 4)
+        decoded = base64.b64decode(payload).decode("utf-8")
+        return json.loads(decoded)
+    except Exception:
+        return {}
+
+@app.post("/api/auth/login")
+def auth_login(body: LoginIn):
+    """Valida login manual usando e-mail e palavra-passe da .env"""
+    admin_email = os.getenv("ADMIN_EMAIL", "")
+    admin_password = os.getenv("ADMIN_PASSWORD", "")
+    
+    if not admin_email or not admin_password:
+        raise HTTPException(status_code=500, detail="Credenciais de administrador não configuradas no servidor.")
+        
+    if body.email == admin_email and body.password == admin_password:
+        return {"status": "success", "message": "Login realizado com sucesso"}
+    else:
+        raise HTTPException(status_code=401, detail="E-mail ou palavra-passe incorretos.")
+
 @app.post("/api/auth/google")
 def auth_google(body: GoogleAuthIn):
-    """Recebe e processa o token do Google OAuth."""
+    """Recebe e processa o token do Google OAuth, validando apenas o e-mail autorizado."""
     if not body.credential:
         raise HTTPException(status_code=400, detail="Token não fornecido")
-    return {"status": "success", "message": "Login via Google realizado com sucesso"}
+        
+    payload = decode_jwt_payload(body.credential)
+    email_google = payload.get("email", "")
+    
+    admin_email = os.getenv("ADMIN_EMAIL", "")
+    if not admin_email:
+        raise HTTPException(status_code=500, detail="E-mail de administrador não configurado no servidor.")
+        
+    if email_google == admin_email:
+        return {"status": "success", "message": "Login via Google realizado com sucesso"}
+    else:
+        raise HTTPException(status_code=403, detail="Este e-mail não tem permissão de acesso ao sistema.")
 
 
 # ─────────────────────────────────────────
