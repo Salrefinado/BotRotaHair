@@ -290,15 +290,34 @@ async function loadMensagensStats() {
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-password').value;
-  if (!email || !pass) { showToast('Preencha e-mail e senha'); return; }
+  if (!email || !pass) { showToast('Preencha e-mail e palavra-passe'); return; }
 
-  localStorage.setItem('rotaHairLogado', 'true');
-  document.getElementById('screen-login').classList.remove('active');
-  document.getElementById('screen-app').classList.add('active');
-  lucide.createIcons();
-  initGreeting();
-  initAgendaHeader();
-  await initApp();
+  try {
+    const r = await fetch(API + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, password: pass })
+    });
+
+    if (!r.ok) {
+      const err = await r.json();
+      showToast(err.detail || 'Falha no login');
+      return;
+    }
+
+    const data = await r.json();
+    if (data.status === 'success') {
+      localStorage.setItem('rotaHairLogado', 'true');
+      document.getElementById('screen-login').classList.remove('active');
+      document.getElementById('screen-app').classList.add('active');
+      lucide.createIcons();
+      initGreeting();
+      initAgendaHeader();
+      await initApp();
+    }
+  } catch (e) {
+    showToast('Erro de conexão com o servidor');
+  }
 }
 
 function togglePassword() {
@@ -323,16 +342,31 @@ async function initGoogleLogin() {
     scope: 'email profile',
     callback: async (response) => {
       if (response.error) { showToast('Erro no login com Google'); return; }
-      const authRes = await apiPost('/api/auth/google', { credential: response.access_token });
-      if (authRes && authRes.status === 'success') {
-        localStorage.setItem('rotaHairLogado', 'true');
-        document.getElementById('screen-login').classList.remove('active');
-        document.getElementById('screen-app').classList.add('active');
-        showToast(authRes.message || 'Login bem-sucedido!');
-        lucide.createIcons();
-        await initApp();
-      } else {
-        showToast('Falha na autenticação com o servidor');
+
+      try {
+        const r = await fetch(API + '/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.access_token })
+        });
+
+        if (!r.ok) {
+          const err = await r.json();
+          showToast(err.detail || 'Falha na autenticação com o Google');
+          return;
+        }
+
+        const authRes = await r.json();
+        if (authRes && authRes.status === 'success') {
+          localStorage.setItem('rotaHairLogado', 'true');
+          document.getElementById('screen-login').classList.remove('active');
+          document.getElementById('screen-app').classList.add('active');
+          showToast(authRes.message || 'Login bem-sucedido!');
+          lucide.createIcons();
+          await initApp();
+        }
+      } catch (e) {
+        showToast('Erro de conexão com o servidor');
       }
     },
   });
