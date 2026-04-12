@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RotaHair" />
+  <link rel="apple-touch-icon" href="static/logo.png" />
+  <link rel="manifest" href="manifest.json" />
+
   <title>RotaHair</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
@@ -12,7 +21,6 @@
 </head>
 <body>
 
-  <!-- ═══════════ LOGIN ═══════════ -->
   <div id="screen-login" class="screen active">
     <div class="login-wrapper">
       <div class="login-brand">
@@ -58,10 +66,8 @@
     </div>
   </div>
 
-  <!-- ═══════════ APP ═══════════ -->
   <div id="screen-app" class="screen">
 
-    <!-- ── BANNER: WhatsApp Desconectado ── -->
     <div id="wpp-banner" class="wpp-banner hidden">
       <div class="wpp-banner-top">
         <div class="wpp-banner-left">
@@ -103,7 +109,6 @@
 
     <main class="app-main" id="app-main">
 
-      <!-- ── HOME ── -->
       <section id="tab-home" class="tab-pane active">
         <div class="home-greeting-block">
           <p class="greeting-time" id="greeting-text">Bom dia</p>
@@ -154,7 +159,6 @@
         </div>
       </section>
 
-      <!-- ── AGENDA ── -->
       <section id="tab-agenda" class="tab-pane">
         <div class="agenda-header-block">
           <div class="agenda-date-info">
@@ -169,7 +173,6 @@
         <div class="agenda-list" id="agenda-list"></div>
       </section>
 
-      <!-- ── SERVIÇOS ── -->
       <section id="tab-servicos" class="tab-pane">
         <div class="list-header">
           <h2 class="list-title">Serviços</h2>
@@ -185,7 +188,6 @@
         </div>
       </section>
 
-      <!-- ── PLANOS ── -->
       <section id="tab-planos" class="tab-pane">
         <div class="list-header">
           <h2 class="list-title">Planos</h2>
@@ -201,7 +203,6 @@
         </div>
       </section>
 
-      <!-- ── ACESSOS ── -->
       <section id="tab-acessos" class="tab-pane">
 
         <div class="acessos-section">
@@ -293,7 +294,6 @@
     </nav>
   </div>
 
-  <!-- ═══════════ MODALS ═══════════ -->
   <div id="modal-almoco" class="modal-overlay" onclick="closeModal('modal-almoco')">
     <div class="modal-sheet" onclick="event.stopPropagation()">
       <div class="modal-handle"></div>
@@ -515,6 +515,20 @@
   </div>
 
   <div id="toast" class="toast"></div>
+
+  <div id="pwa-banner" class="pwa-banner hidden">
+    <div class="pwa-banner-inner">
+      <img src="static/logo.png" alt="RotaHair" class="pwa-banner-logo" />
+      <div class="pwa-banner-text">
+        <strong>Instalar RotaHair</strong>
+        <span>Adicione à tela inicial para acesso rápido</span>
+      </div>
+      <button class="pwa-btn-install" id="pwa-btn-install">Instalar</button>
+      <button class="pwa-btn-close" id="pwa-btn-close" aria-label="Fechar">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
