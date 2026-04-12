@@ -911,3 +911,181 @@ function formatPrice(v) { return Number(v).toFixed(2).replace('.', ','); }
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+/* ════════════════════════════════════════════════════════════
+   PWA — Service Worker + Prompt de Instalação
+   Cole este bloco inteiro no FINAL do app.js existente
+════════════════════════════════════════════════════════════ */
+
+// ─────────────────────────────────────────
+// SERVICE WORKER
+// ─────────────────────────────────────────
+(function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      console.log('[PWA] Service Worker registrado:', reg.scope);
+    }).catch((err) => {
+      console.warn('[PWA] Falha ao registrar SW:', err);
+    });
+  });
+})();
+
+// ─────────────────────────────────────────
+// PROMPT DE INSTALAÇÃO (Android/Chrome)
+// ─────────────────────────────────────────
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+
+  /* Só exibe se não foi dispensado antes */
+  const dismissed = localStorage.getItem('pwaBannerDismissed');
+  if (dismissed) return;
+
+  /* Aguarda 3s para não aparecer logo de cara */
+  setTimeout(showPwaBanner, 3000);
+});
+
+window.addEventListener('appinstalled', () => {
+  console.log('[PWA] App instalado com sucesso!');
+  deferredInstallPrompt = null;
+  hidePwaBanner();
+  showToast('✅ RotaHair instalado na tela inicial!');
+  localStorage.setItem('pwaBannerDismissed', 'installed');
+});
+
+function showPwaBanner() {
+  const banner = document.getElementById('pwa-banner');
+  if (!banner) return;
+  banner.classList.remove('hidden');
+  setTimeout(() => banner.classList.add('show'), 50);
+  lucide.createIcons();
+}
+
+function hidePwaBanner() {
+  const banner = document.getElementById('pwa-banner');
+  if (!banner) return;
+  banner.classList.remove('show');
+  setTimeout(() => banner.classList.add('hidden'), 400);
+}
+
+async function installPwa() {
+  if (!deferredInstallPrompt) {
+    /* Fallback: redireciona para página de instruções */
+    showInstalarScreen();
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  console.log('[PWA] Resultado da instalação:', outcome);
+  deferredInstallPrompt = null;
+  hidePwaBanner();
+  if (outcome === 'dismissed') {
+    localStorage.setItem('pwaBannerDismissed', 'true');
+  }
+}
+
+function dismissPwaBanner() {
+  hidePwaBanner();
+  localStorage.setItem('pwaBannerDismissed', 'true');
+}
+
+/* Wires dos botões do banner */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('pwa-btn-install')?.addEventListener('click', installPwa);
+  document.getElementById('pwa-btn-close')?.addEventListener('click', dismissPwaBanner);
+});
+
+// ─────────────────────────────────────────
+// ROTA /instalar — instrução para iOS e
+//   fallback quando prompt não disponível
+// ─────────────────────────────────────────
+function showInstalarScreen() {
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isAndroid = /android/i.test(navigator.userAgent);
+
+  /* Cria a tela dinamicamente se não existir */
+  if (!document.getElementById('screen-instalar')) {
+    const scr = document.createElement('div');
+    scr.id = 'screen-instalar';
+    scr.className = 'screen';
+    scr.innerHTML = buildInstalarHTML(isIos, isAndroid);
+    document.body.insertBefore(scr, document.getElementById('screen-login'));
+  }
+
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-instalar').classList.add('active');
+  lucide.createIcons();
+}
+
+function buildInstalarHTML(isIos, isAndroid) {
+  const steps = isIos ? [
+    { n: 1, title: 'Toque no botão Compartilhar', desc: 'Ícone de seta para cima na barra inferior do Safari' },
+    { n: 2, title: 'Role para baixo e toque em', desc: '"Adicionar à Tela de Início" na lista de opções' },
+    { n: 3, title: 'Confirme o nome e toque em', desc: '"Adicionar" no canto superior direito' },
+  ] : [
+    { n: 1, title: 'Abra o menu do Chrome', desc: 'Toque nos 3 pontinhos no canto superior direito' },
+    { n: 2, title: 'Toque em "Instalar app"', desc: 'Ou "Adicionar à tela inicial" em versões antigas' },
+    { n: 3, title: 'Confirme a instalação', desc: 'Toque em "Instalar" na janela que aparecer' },
+  ];
+
+  const stepsHTML = steps.map(s => `
+    <div class="instalar-step">
+      <div class="instalar-step-num">${s.n}</div>
+      <div class="instalar-step-text">
+        <strong>${s.title}</strong>
+        <span>${s.desc}</span>
+      </div>
+    </div>
+  `).join('');
+
+  const btnAndroid = (!isIos && deferredInstallPrompt) ? `
+    <button class="instalar-android-btn" onclick="installPwaFromPage()">
+      <i data-lucide="download"></i>
+      Instalar agora
+    </button>
+  ` : '';
+
+  return `
+    <div class="instalar-wrapper">
+      <img src="static/logo.png" alt="RotaHair" class="instalar-logo" />
+      <h1 class="instalar-title">Instalar RotaHair</h1>
+      <p class="instalar-sub">
+        Adicione o painel à sua tela inicial para acesso rápido,<br>
+        como um app nativo — sem precisar abrir o navegador.
+      </p>
+      ${btnAndroid}
+      <div class="instalar-steps">${stepsHTML}</div>
+      <button class="btn-ghost w-full" onclick="voltarDoInstalar()" style="margin-top:8px">
+        Voltar ao painel
+      </button>
+    </div>
+  `;
+}
+
+async function installPwaFromPage() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  if (outcome === 'accepted') {
+    showToast('✅ RotaHair instalado!');
+    voltarDoInstalar();
+  }
+}
+
+function voltarDoInstalar() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const isLogged = localStorage.getItem('rotaHairLogado') === 'true';
+  document.getElementById(isLogged ? 'screen-app' : 'screen-login').classList.add('active');
+  if (isLogged) lucide.createIcons();
+}
+
+/* ── Abre /instalar quando a URL for acessada diretamente ── */
+(function checkInstalarRoute() {
+  if (window.location.pathname === '/instalar') {
+    window.addEventListener('load', showInstalarScreen);
+  }
+})();
