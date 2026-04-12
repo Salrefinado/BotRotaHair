@@ -13,11 +13,9 @@ if not exist .env (
 :: 2. Configuracao de Modo e Tokens
 set "CMD_MODE=1"
 set "NGROK_AUTHTOKEN="
-set "NGROK_DOMAIN="
 for /f "usebackq tokens=1,2 delims==" %%A in (".env") do (
     if "%%A"=="CMD" set "CMD_MODE=%%B"
     if "%%A"=="NGROK_AUTHTOKEN" set "NGROK_AUTHTOKEN=%%B"
-    if "%%A"=="NGROK_DOMAIN" set "NGROK_DOMAIN=%%B"
 )
 
 echo ==========================================
@@ -42,15 +40,15 @@ if "%CMD_MODE%"=="0" goto MODO_FANTASMA
 
 :MODO_NORMAL
 echo [1/3] Iniciando a API Python (Minimizado)...
-start "RotaHair - API Python" /min cmd /c "call venv\Scripts\activate && python api.py"
+start "RotaHair - API Python" /min cmd /k "call venv\Scripts\activate && python api.py"
 timeout /t 3 /nobreak > nul
 
 echo [2/3] Iniciando o Bot do WhatsApp (Minimizado)...
-start "RotaHair - Bot WhatsApp" /min cmd /c "node bot.js"
+start "RotaHair - Bot WhatsApp" /min cmd /k "node bot.js"
 timeout /t 2 /nobreak > nul
 
 echo [3/3] Iniciando o Tunel Ngrok (Minimizado)...
-start "RotaHair - Ngrok" /min cmd /c "ngrok http --domain=%NGROK_DOMAIN% 8000"
+start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=kam-breezelike-carmelia.ngrok-free.dev 8000"
 
 echo.
 echo ==========================================
@@ -76,7 +74,7 @@ timeout /t 2 /nobreak > nul
 
 echo [3/3] Iniciando o Tunel Ngrok em segundo plano...
 echo Set WshShell = CreateObject("WScript.Shell") > run_ngrok.vbs
-echo WshShell.Run "cmd /c ngrok http --domain=%NGROK_DOMAIN% 8000", 0, False >> run_ngrok.vbs
+echo WshShell.Run "cmd /c ngrok http --domain=kam-breezelike-carmelia.ngrok-free.dev 8000", 0, False >> run_ngrok.vbs
 cscript //nologo run_ngrok.vbs
 del run_ngrok.vbs
 
