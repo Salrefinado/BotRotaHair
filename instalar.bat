@@ -1,5 +1,4 @@
 @echo off
-setlocal enabledelayedexpansion
 title RotaHair - Instalador
 color 0A
 
@@ -9,13 +8,10 @@ echo ==========================================
 echo.
 echo [1/5] Verificando programas base (Python, Node.js, Ngrok)...
 
-set "RELOAD_PATH=0"
-
 where python >nul 2>&1
 if %errorlevel% neq 0 (
     echo Instalando Python...
     winget install --id Python.Python.3.13 -e --source winget --accept-package-agreements --accept-source-agreements
-    set "RELOAD_PATH=1"
 ) else (
     echo [OK] Python ja esta instalado.
 )
@@ -24,7 +20,6 @@ where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo Instalando Node.js...
     winget install --id OpenJS.NodeJS -e --source winget --accept-package-agreements --accept-source-agreements
-    set "RELOAD_PATH=1"
 ) else (
     echo [OK] Node.js ja esta instalado.
 )
@@ -33,17 +28,8 @@ where ngrok >nul 2>&1
 if %errorlevel% neq 0 (
     echo Instalando Ngrok...
     winget install --id ngrok.ngrok -e --source winget --accept-package-agreements --accept-source-agreements
-    set "RELOAD_PATH=1"
 ) else (
     echo [OK] Ngrok ja esta instalado.
-)
-
-:: Se algo foi instalado, atualiza o PATH na sessao atual para nao precisar reiniciar o PC
-if "%RELOAD_PATH%"=="1" (
-    echo Atualizando variaveis de ambiente...
-    for /f "tokens=2*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v Path 2^>nul') do set "SYS_PATH=%%B"
-    for /f "tokens=2*" %%A in ('reg query "HKCU\Environment" /v Path 2^>nul') do set "USR_PATH=%%B"
-    set "PATH=!SYS_PATH!;!USR_PATH!;%PATH%"
 )
 
 echo.
@@ -72,32 +58,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScr
 echo.
 echo [5/5] Configurando arquivo .env...
 if not exist .env (
-    echo Vamos configurar as suas chaves agora.
-    set /p NUM_DONO="Digite o seu numero do WhatsApp (ex: 5541999999999): "
-    set /p NOME_DON="Digite o seu nome: "
-    set /p ANT_KEY="Cole a sua ANTHROPIC_KEY (sk-ant-...): "
-    set /p NGRK_DOM="Cole o seu NGROK_DOMAIN (sem https://): "
-    set /p NGRK_AUTH="Cole o seu NGROK_AUTHTOKEN: "
-
-    echo NUMERO_DONO=!NUM_DONO!> .env
-    echo NOME_DONO=!NOME_DON!>> .env
+    echo NUMERO_DONO=> .env
+    echo NOME_DONO=Rodrigo>> .env
     echo NUMERO_TESTE=>> .env
-    echo ANTHROPIC_KEY=!ANT_KEY!>> .env
-    echo NGROK_DOMAIN=!NGRK_DOM!>> .env
-    echo NGROK_AUTHTOKEN=!NGRK_AUTH!>> .env
+    echo ANTHROPIC_KEY=>> .env
+    echo NGROK_DOMAIN=>> .env
+    echo NGROK_AUTHTOKEN=>> .env
     echo CMD=1>> .env
-    echo.
-    echo Arquivo .env criado e configurado com sucesso!
-) else (
-    echo [OK] Arquivo .env ja existe.
+    echo Arquivo .env criado com sucesso.
 )
 
-echo.
 echo ==========================================
-echo Instalacao concluida! O sistema ja pode ser iniciado.
+echo Instalacao concluida!
+echo O arquivo .env sera aberto agora.
+echo Preencha suas informacoes, salve e feche o bloco de notas.
+echo Depois, basta usar o atalho "RotaHair - Iniciar" na Area de Trabalho.
 echo ==========================================
-echo.
-echo Pressione qualquer tecla para abrir o RotaHair agora...
-pause >nul
-start "" "%SC_INICIAR%"
+pause
+notepad .env
 exit
