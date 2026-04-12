@@ -20,7 +20,6 @@ echo.
 echo ==========================================
 echo Sistema encerrado com sucesso!
 echo ==========================================
-echo.
-echo Esta janela ira fechar em 3 segundos...
+
 timeout /t 3 /nobreak > nul
 exit
