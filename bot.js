@@ -1,6 +1,8 @@
 /**
  * bot.js — RotaHair WhatsApp Bot
- * whatsapp-web.js + Anthropic Claude API / Google Gemini API (Fallback)
+ * whatsapp-web.js + Anthropic Claude API
+ *
+ * DEPENDÊNCIA NOVA: npm install qrcode
  */
 
 'use strict';
@@ -9,9 +11,8 @@ require('dotenv').config();
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
-const QRCode         = require('qrcode');          
+const QRCode         = require('qrcode');          // <-- NOVO: gera data URL para o painel web
 const Anthropic      = require('@anthropic-ai/sdk');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // <-- NOVO: Gemini API
 const fetch          = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
 const { buildClientPrompt, buildOwnerSystemPrompt } = require('./prompts');
@@ -28,32 +29,18 @@ if (!NUMERO_DONO) {
   console.error('❌ NUMERO_DONO não definido no .env');
   process.exit(1);
 }
-
-// Inicialização condicional das APIs de IA
-let anthropic = null;
-if (process.env.ANTHROPIC_KEY) {
-  anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
-}
-
-let genAI = null;
-if (process.env.GEMINI_API_KEY) {
-  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-}
-
-if (!anthropic && !genAI) {
-  console.error('❌ Nenhuma chave de IA configurada no .env (ANTHROPIC_KEY ou GEMINI_API_KEY)');
+if (!process.env.ANTHROPIC_KEY) {
+  console.error('❌ ANTHROPIC_KEY não definida no .env');
   process.exit(1);
 }
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
 
 // ─────────────────────────────────────────
 // WHATSAPP CLIENT
 // ─────────────────────────────────────────
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
-  // Previne o erro "Execution context was destroyed" desativando o cache local da página
-  webVersionCache: { 
-    type: 'none' 
-  },
   puppeteer: {
     headless: true,
     args: [
@@ -71,6 +58,7 @@ client.on('qr', async (qr) => {
   console.log('\n✦ Escaneie o QR Code abaixo com o WhatsApp:\n');
   qrcodeTerminal.generate(qr, { small: true });
 
+  // Envia o QR como imagem base64 para a API → aparece no painel web
   try {
     const dataUrl = await QRCode.toDataURL(qr, { width: 300, margin: 2 });
     await apiPost('/api/whatsapp/qr', { qr: dataUrl });
@@ -140,6 +128,7 @@ client.on('message', async (msg) => {
       await handleClientMessage(msg, text, ctx);
     }
 
+    // Registra a mensagem respondida no banco (apenas clientes, não o dono)
     if (!isDono) {
       await apiPost('/api/mensagens/log', { sender });
     }
@@ -156,39 +145,15 @@ async function handleClientMessage(msg, text, ctx) {
   console.log('   Tipo: CLIENTE');
 
   const systemPrompt = buildClientPrompt(ctx);
-  let reply = null;
 
-  // 1. Tenta usar a Anthropic (Claude) primeiro se estiver configurada
-  if (anthropic) {
-    try {
-      const response = await anthropic.messages.create({
-        model:      'claude-sonnet-4-20250514',
-        max_tokens: 600,
-        system:     systemPrompt,
-        messages:   [{ role: 'user', content: text }],
-      });
-      reply = response.content?.[0]?.text;
-    } catch (err) {
-      console.error('   ⚠️ Erro na Anthropic (Claude):', err.message);
-      // Se falhar, segue para o bloco do Gemini (fallback)
-    }
-  }
+  const response = await anthropic.messages.create({
+    model:      'claude-sonnet-4-20250514',
+    max_tokens: 600,
+    system:     systemPrompt,
+    messages:   [{ role: 'user', content: text }],
+  });
 
-  // 2. Se falhou na Anthropic ou se apenas a chave do Gemini existir, usa Gemini
-  if (!reply && genAI) {
-    try {
-      console.log('   🔄 Processando com Google Gemini (Fallback)...');
-      reply = await callGeminiWithRetry(text, systemPrompt);
-    } catch (err) {
-      console.error('   ❌ Erro final no Google Gemini:', err.message);
-    }
-  }
-
-  reply = reply || 'Desculpe, não consegui processar sua mensagem no momento.';
-  
-  // Remove asteriscos da resposta para evitar markdown negrito na formatação visual do WhatsApp
-  reply = reply.replace(/\*/g, '');
-
+  const reply = response.content?.[0]?.text || 'Desculpe, não consegui processar sua mensagem.';
   console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
   await msg.reply(reply);
 }
@@ -200,35 +165,16 @@ async function handleOwnerMessage(msg, text, ctx) {
   console.log('   Tipo: DONO');
 
   const systemPrompt = buildOwnerSystemPrompt(ctx);
-  let rawJson = null;
 
-  // 1. Tenta usar a Anthropic (Claude)
-  if (anthropic) {
-    try {
-      const response = await anthropic.messages.create({
-        model:      'claude-sonnet-4-20250514',
-        max_tokens: 300,
-        system:     systemPrompt,
-        messages:   [{ role: 'user', content: text }],
-      });
-      rawJson = response.content?.[0]?.text;
-    } catch (err) {
-      console.error('   ⚠️ Erro na Anthropic (Claude):', err.message);
-    }
-  }
+  const response = await anthropic.messages.create({
+    model:      'claude-sonnet-4-20250514',
+    max_tokens: 300,
+    system:     systemPrompt,
+    messages:   [{ role: 'user', content: text }],
+  });
 
-  // 2. Fallback para Gemini
-  if (!rawJson && genAI) {
-    try {
-      console.log('   🔄 Processando comando com Google Gemini (Fallback)...');
-      rawJson = await callGeminiWithRetry(text, systemPrompt);
-    } catch (err) {
-      console.error('   ❌ Erro final no Google Gemini:', err.message);
-    }
-  }
-
-  rawJson = rawJson || '{}';
-  console.log('   JSON da IA:', rawJson);
+  const rawJson = response.content?.[0]?.text || '{}';
+  console.log('   JSON do Claude:', rawJson);
 
   let cmd;
   try {
@@ -241,10 +187,7 @@ async function handleOwnerMessage(msg, text, ctx) {
   }
 
   await executeCommand(cmd, ctx);
-  
-  let confirmacao = cmd.confirmacao || '✅ Feito!';
-  confirmacao = confirmacao.replace(/\*/g, ''); // Remove formatações indesejadas
-  await msg.reply(confirmacao);
+  await msg.reply(cmd.confirmacao || '✅ Feito!');
 }
 
 // ─────────────────────────────────────────
@@ -295,33 +238,8 @@ async function executeCommand(cmd, ctx) {
 }
 
 // ─────────────────────────────────────────
-// HELPERS DE API E IA
+// HELPERS DE API
 // ─────────────────────────────────────────
-
-// Helper para retentar o Gemini automaticamente caso a API esteja sobrecarregada (Erro 503)
-async function callGeminiWithRetry(text, systemPrompt) {
-  for (let tentativa = 1; tentativa <= 3; tentativa++) {
-    try {
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
-        systemInstruction: systemPrompt 
-      });
-      const result = await model.generateContent(text);
-      return result.response.text();
-    } catch (err) {
-      // Se for erro 503 e ainda tivermos tentativas sobrando, nós esperamos e tentamos de novo
-      if (err.message && err.message.includes('503') && tentativa < 3) {
-        const tempoEspera = tentativa * 2000; // Aguarda 2s na primeira falha, 4s na segunda
-        console.log(`   ⏳ Gemini com alta demanda (503). Retentando em ${tempoEspera / 1000}s (Tentativa ${tentativa + 1}/3)...`);
-        await new Promise(r => setTimeout(r, tempoEspera));
-      } else {
-        // Se não for 503 ou se já esgotou as tentativas, joga o erro para frente
-        throw err;
-      }
-    }
-  }
-}
-
 async function fetchContext() {
   try {
     const res = await fetch(`${API_BASE}/api/context`);
@@ -382,5 +300,5 @@ function calcRetorno() {
 // ─────────────────────────────────────────
 // START
 // ─────────────────────────────────────────
-console.log('✦ Iniciando RotaHair Bot com Fallback Inteligente (Claude -> Gemini)...');
+console.log('✦ Iniciando RotaHair Bot...');
 client.initialize();
