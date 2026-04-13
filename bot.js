@@ -1,8 +1,6 @@
 /**
  * bot.js — RotaHair WhatsApp Bot
- * whatsapp-web.js + Anthropic Claude API
- *
- * DEPENDÊNCIA NOVA: npm install qrcode
+ * whatsapp-web.js + Anthropic Claude API / Google Gemini API (Fallback)
  */
 
 'use strict';
@@ -11,8 +9,9 @@ require('dotenv').config();
 
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
-const QRCode         = require('qrcode');          // <-- NOVO: gera data URL para o painel web
+const QRCode         = require('qrcode');          
 const Anthropic      = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai'); // <-- NOVO: Gemini API
 const fetch          = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 
 const { buildClientPrompt, buildOwnerSystemPrompt } = require('./prompts');
@@ -29,12 +28,22 @@ if (!NUMERO_DONO) {
   console.error('❌ NUMERO_DONO não definido no .env');
   process.exit(1);
 }
-if (!process.env.ANTHROPIC_KEY) {
-  console.error('❌ ANTHROPIC_KEY não definida no .env');
-  process.exit(1);
+
+// Inicialização condicional das APIs de IA
+let anthropic = null;
+if (process.env.ANTHROPIC_KEY) {
+  anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
 }
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
+let genAI = null;
+if (process.env.GEMINI_API_KEY) {
+  genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+}
+
+if (!anthropic && !genAI) {
+  console.error('❌ Nenhuma chave de IA configurada no .env (ANTHROPIC_KEY ou GEMINI_API_KEY)');
+  process.exit(1);
+}
 
 // ─────────────────────────────────────────
 // WHATSAPP CLIENT
@@ -58,7 +67,6 @@ client.on('qr', async (qr) => {
   console.log('\n✦ Escaneie o QR Code abaixo com o WhatsApp:\n');
   qrcodeTerminal.generate(qr, { small: true });
 
-  // Envia o QR como imagem base64 para a API → aparece no painel web
   try {
     const dataUrl = await QRCode.toDataURL(qr, { width: 300, margin: 2 });
     await apiPost('/api/whatsapp/qr', { qr: dataUrl });
@@ -128,7 +136,6 @@ client.on('message', async (msg) => {
       await handleClientMessage(msg, text, ctx);
     }
 
-    // Registra a mensagem respondida no banco (apenas clientes, não o dono)
     if (!isDono) {
       await apiPost('/api/mensagens/log', { sender });
     }
@@ -145,15 +152,44 @@ async function handleClientMessage(msg, text, ctx) {
   console.log('   Tipo: CLIENTE');
 
   const systemPrompt = buildClientPrompt(ctx);
+  let reply = null;
 
-  const response = await anthropic.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 600,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: text }],
-  });
+  // 1. Tenta usar a Anthropic (Claude) primeiro se estiver configurada
+  if (anthropic) {
+    try {
+      const response = await anthropic.messages.create({
+        model:      'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: text }],
+      });
+      reply = response.content?.[0]?.text;
+    } catch (err) {
+      console.error('   ⚠️ Erro na Anthropic (Claude):', err.message);
+      // Se falhar, segue para o bloco do Gemini (fallback)
+    }
+  }
 
-  const reply = response.content?.[0]?.text || 'Desculpe, não consegui processar sua mensagem.';
+  // 2. Se falhou na Anthropic ou se apenas a chave do Gemini existir, usa Gemini
+  if (!reply && genAI) {
+    try {
+      console.log('   🔄 Processando com Google Gemini (Fallback)...');
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt 
+      });
+      const result = await model.generateContent(text);
+      reply = result.response.text();
+    } catch (err) {
+      console.error('   ❌ Erro no Google Gemini:', err.message);
+    }
+  }
+
+  reply = reply || 'Desculpe, não consegui processar sua mensagem no momento.';
+  
+  // Remove asteriscos da resposta para evitar markdown negrito na formatação visual do WhatsApp
+  reply = reply.replace(/\*/g, '');
+
   console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
   await msg.reply(reply);
 }
@@ -165,16 +201,40 @@ async function handleOwnerMessage(msg, text, ctx) {
   console.log('   Tipo: DONO');
 
   const systemPrompt = buildOwnerSystemPrompt(ctx);
+  let rawJson = null;
 
-  const response = await anthropic.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 300,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: text }],
-  });
+  // 1. Tenta usar a Anthropic (Claude)
+  if (anthropic) {
+    try {
+      const response = await anthropic.messages.create({
+        model:      'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: text }],
+      });
+      rawJson = response.content?.[0]?.text;
+    } catch (err) {
+      console.error('   ⚠️ Erro na Anthropic (Claude):', err.message);
+    }
+  }
 
-  const rawJson = response.content?.[0]?.text || '{}';
-  console.log('   JSON do Claude:', rawJson);
+  // 2. Fallback para Gemini
+  if (!rawJson && genAI) {
+    try {
+      console.log('   🔄 Processando comando com Google Gemini (Fallback)...');
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        systemInstruction: systemPrompt 
+      });
+      const result = await model.generateContent(text);
+      rawJson = result.response.text();
+    } catch (err) {
+      console.error('   ❌ Erro no Google Gemini:', err.message);
+    }
+  }
+
+  rawJson = rawJson || '{}';
+  console.log('   JSON da IA:', rawJson);
 
   let cmd;
   try {
@@ -187,7 +247,10 @@ async function handleOwnerMessage(msg, text, ctx) {
   }
 
   await executeCommand(cmd, ctx);
-  await msg.reply(cmd.confirmacao || '✅ Feito!');
+  
+  let confirmacao = cmd.confirmacao || '✅ Feito!';
+  confirmacao = confirmacao.replace(/\*/g, ''); // Remove formatações indesejadas
+  await msg.reply(confirmacao);
 }
 
 // ─────────────────────────────────────────
@@ -300,5 +363,5 @@ function calcRetorno() {
 // ─────────────────────────────────────────
 // START
 // ─────────────────────────────────────────
-console.log('✦ Iniciando RotaHair Bot...');
+console.log('✦ Iniciando RotaHair Bot com Fallback Inteligente (Claude -> Gemini)...');
 client.initialize();
