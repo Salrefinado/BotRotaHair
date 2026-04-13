@@ -34,7 +34,10 @@ if (!process.env.ANTHROPIC_KEY) {
   process.exit(1);
 }
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
+const anthropic = new Anthropic({ 
+  apiKey: process.env.ANTHROPIC_KEY,
+  maxRetries: 4, // Tenta novamente caso haja erro de overload (529) na API
+});
 
 // ─────────────────────────────────────────
 // WHATSAPP CLIENT
@@ -146,16 +149,25 @@ async function handleClientMessage(msg, text, ctx) {
 
   const systemPrompt = buildClientPrompt(ctx);
 
-  const response = await anthropic.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 600,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: text }],
-  });
+  try {
+    const response = await anthropic.messages.create({
+      model:      'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      system:     systemPrompt,
+      messages:   [{ role: 'user', content: text }],
+    });
 
-  const reply = response.content?.[0]?.text || 'Desculpe, não consegui processar sua mensagem.';
-  console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
-  await msg.reply(reply);
+    const reply = response.content?.[0]?.text || 'Desculpe, não consegui processar sua mensagem.';
+    console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
+    await msg.reply(reply);
+  } catch (error) {
+    console.error('   ❌ Erro na API Anthropic (Cliente):', error.message);
+    if (error.status === 529) {
+      await msg.reply('⚠️ Nosso sistema está temporariamente sobrecarregado. Por favor, aguarde um instante e tente novamente.');
+    } else {
+      await msg.reply('⚠️ Ocorreu um erro inesperado ao processar sua mensagem. Tente novamente mais tarde.');
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -166,15 +178,26 @@ async function handleOwnerMessage(msg, text, ctx) {
 
   const systemPrompt = buildOwnerSystemPrompt(ctx);
 
-  const response = await anthropic.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 300,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: text }],
-  });
+  let rawJson;
+  try {
+    const response = await anthropic.messages.create({
+      model:      'claude-sonnet-4-20250514',
+      max_tokens: 300,
+      system:     systemPrompt,
+      messages:   [{ role: 'user', content: text }],
+    });
 
-  const rawJson = response.content?.[0]?.text || '{}';
-  console.log('   JSON do Claude:', rawJson);
+    rawJson = response.content?.[0]?.text || '{}';
+    console.log('   JSON do Claude:', rawJson);
+  } catch (error) {
+    console.error('   ❌ Erro na API Anthropic (Dono):', error.message);
+    if (error.status === 529) {
+      await msg.reply('⚠️ O sistema de IA está sobrecarregado no momento (Erro 529). Tente o comando novamente em breve.');
+    } else {
+      await msg.reply('⚠️ Erro de comunicação com a inteligência artificial. Verifique os logs.');
+    }
+    return;
+  }
 
   let cmd;
   try {
