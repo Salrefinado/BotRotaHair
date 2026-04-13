@@ -1,8 +1,8 @@
 /**
  * bot.js — RotaHair WhatsApp Bot
- * whatsapp-web.js + Anthropic Claude API ou Google Gemini API
+ * whatsapp-web.js + Anthropic Claude API
  *
- * DEPENDÊNCIA NOVA: npm install qrcode @google/generative-ai
+ * DEPENDÊNCIA NOVA: npm install qrcode
  */
 
 'use strict';
@@ -12,11 +12,8 @@ require('dotenv').config();
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCode         = require('qrcode');          // <-- NOVO: gera data URL para o painel web
+const Anthropic      = require('@anthropic-ai/sdk');
 const fetch          = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
-
-// APIs de IA
-const Anthropic = require('@anthropic-ai/sdk');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const { buildClientPrompt, buildOwnerSystemPrompt } = require('./prompts');
 
@@ -28,31 +25,16 @@ const NOME_DONO    = process.env.NOME_DONO || 'Rodrigo';
 const NUMERO_TESTE = process.env.NUMERO_TESTE;
 const API_BASE     = process.env.API_BASE_URL || 'http://localhost:8000';
 
-const ANTHROPIC_KEY  = process.env.ANTHROPIC_KEY;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
 if (!NUMERO_DONO) {
   console.error('❌ NUMERO_DONO não definido no .env');
   process.exit(1);
 }
-
-if (!ANTHROPIC_KEY && !GEMINI_API_KEY) {
-  console.error('❌ Nenhuma chave de API definida! Preencha ANTHROPIC_KEY ou GEMINI_API_KEY no .env');
+if (!process.env.ANTHROPIC_KEY) {
+  console.error('❌ ANTHROPIC_KEY não definida no .env');
   process.exit(1);
 }
 
-let anthropic;
-let geminiModel;
-
-// Inicializa o cliente correto baseado na chave disponível
-if (ANTHROPIC_KEY) {
-  anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
-  console.log('🧠 IA Ativa: Anthropic Claude');
-} else if (GEMINI_API_KEY) {
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-  console.log('🧠 IA Ativa: Google Gemini');
-}
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
 
 // ─────────────────────────────────────────
 // WHATSAPP CLIENT
@@ -163,59 +145,15 @@ async function handleClientMessage(msg, text, ctx) {
   console.log('   Tipo: CLIENTE');
 
   const systemPrompt = buildClientPrompt(ctx);
-  let reply = '';
-  let sucesso = false;
-  let tentativa = 1;
 
-  while (!sucesso) {
-    try {
-      if (anthropic) {
-        const response = await anthropic.messages.create({
-          model:      'claude-3-haiku-20240307',
-          max_tokens: 600,
-          system:     systemPrompt,
-          messages:   [{ role: 'user', content: text }],
-        });
-        reply = response.content?.[0]?.text || '';
-      } else if (geminiModel) {
-        const result = await geminiModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text }] }],
-          systemInstruction: systemPrompt
-        });
-        reply = result.response.text() || '';
-      }
+  const response = await anthropic.messages.create({
+    model:      'claude-sonnet-4-20250514',
+    max_tokens: 600,
+    system:     systemPrompt,
+    messages:   [{ role: 'user', content: text }],
+  });
 
-      if (reply) {
-        sucesso = true;
-      } else {
-        reply = 'Desculpe, não consegui processar sua mensagem.';
-        sucesso = true;
-      }
-
-      // Limpa a formatação de negrito e asteriscos indesejados
-      reply = reply.replace(/\*\*/g, '').replace(/\*/g, '');
-
-    } catch (err) {
-      console.error(`   ❌ Erro na API da IA (Cliente) - Tentativa ${tentativa}:`, err.message);
-      
-      let tempoEspera = 10000; // Padrão 10s
-      
-      // Tenta extrair o tempo do erro do Gemini (ex: "Please retry in 25.460834771s")
-      const match = err.message.match(/retry in ([\d\.]+)s/);
-      if (match && match[1]) {
-        tempoEspera = Math.ceil(parseFloat(match[1])) * 1000 + 1000; // Tempo do erro + 1s de margem
-      } else if (err.message.includes('429') || err.message.includes('Too Many Requests') || err.message.includes('Quota exceeded')) {
-        tempoEspera = Math.min(10000 * Math.pow(1.5, tentativa - 1), 60000); // Exponencial até 60s
-      } else {
-        tempoEspera = 5000;
-      }
-
-      console.log(`   ⏳ Aguardando ${tempoEspera / 1000}s para tentar novamente...`);
-      await new Promise(resolve => setTimeout(resolve, tempoEspera));
-      tentativa++;
-    }
-  }
-
+  const reply = response.content?.[0]?.text || 'Desculpe, não consegui processar sua mensagem.';
   console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
   await msg.reply(reply);
 }
@@ -227,54 +165,16 @@ async function handleOwnerMessage(msg, text, ctx) {
   console.log('   Tipo: DONO');
 
   const systemPrompt = buildOwnerSystemPrompt(ctx);
-  let rawJson = '';
-  let sucesso = false;
-  let tentativa = 1;
 
-  while (!sucesso) {
-    try {
-      if (anthropic) {
-        const response = await anthropic.messages.create({
-          model:      'claude-3-haiku-20240307',
-          max_tokens: 300,
-          system:     systemPrompt,
-          messages:   [{ role: 'user', content: text }],
-        });
-        rawJson = response.content?.[0]?.text || '';
-      } else if (geminiModel) {
-        const result = await geminiModel.generateContent({
-          contents: [{ role: 'user', parts: [{ text }] }],
-          systemInstruction: systemPrompt
-        });
-        rawJson = result.response.text() || '';
-      }
+  const response = await anthropic.messages.create({
+    model:      'claude-sonnet-4-20250514',
+    max_tokens: 300,
+    system:     systemPrompt,
+    messages:   [{ role: 'user', content: text }],
+  });
 
-      if (rawJson) {
-         sucesso = true;
-      } else {
-         rawJson = '{}';
-         sucesso = true;
-      }
-    } catch (err) {
-      console.error(`   ❌ Erro na API da IA (Dono) - Tentativa ${tentativa}:`, err.message);
-      
-      let tempoEspera = 10000;
-      const match = err.message.match(/retry in ([\d\.]+)s/);
-      if (match && match[1]) {
-        tempoEspera = Math.ceil(parseFloat(match[1])) * 1000 + 1000;
-      } else if (err.message.includes('429') || err.message.includes('Too Many Requests') || err.message.includes('Quota exceeded')) {
-        tempoEspera = Math.min(10000 * Math.pow(1.5, tentativa - 1), 60000);
-      } else {
-        tempoEspera = 5000;
-      }
-
-      console.log(`   ⏳ Aguardando ${tempoEspera / 1000}s para tentar novamente...`);
-      await new Promise(resolve => setTimeout(resolve, tempoEspera));
-      tentativa++;
-    }
-  }
-
-  console.log('   JSON da IA:', rawJson);
+  const rawJson = response.content?.[0]?.text || '{}';
+  console.log('   JSON do Claude:', rawJson);
 
   let cmd;
   try {
