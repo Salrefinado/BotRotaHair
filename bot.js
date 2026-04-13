@@ -163,30 +163,57 @@ async function handleClientMessage(msg, text, ctx) {
   console.log('   Tipo: CLIENTE');
 
   const systemPrompt = buildClientPrompt(ctx);
-  let reply = 'Desculpe, não consegui processar sua mensagem.';
+  let reply = '';
+  let sucesso = false;
+  let tentativa = 1;
 
-  try {
-    if (anthropic) {
-      const response = await anthropic.messages.create({
-        model:      'claude-3-haiku-20240307',
-        max_tokens: 600,
-        system:     systemPrompt,
-        messages:   [{ role: 'user', content: text }],
-      });
-      reply = response.content?.[0]?.text || reply;
-    } else if (geminiModel) {
-      const result = await geminiModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text }] }],
-        systemInstruction: systemPrompt
-      });
-      reply = result.response.text() || reply;
+  while (!sucesso) {
+    try {
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model:      'claude-3-haiku-20240307',
+          max_tokens: 600,
+          system:     systemPrompt,
+          messages:   [{ role: 'user', content: text }],
+        });
+        reply = response.content?.[0]?.text || '';
+      } else if (geminiModel) {
+        const result = await geminiModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text }] }],
+          systemInstruction: systemPrompt
+        });
+        reply = result.response.text() || '';
+      }
+
+      if (reply) {
+        sucesso = true;
+      } else {
+        reply = 'Desculpe, não consegui processar sua mensagem.';
+        sucesso = true;
+      }
+
+      // Limpa a formatação de negrito e asteriscos indesejados
+      reply = reply.replace(/\*\*/g, '').replace(/\*/g, '');
+
+    } catch (err) {
+      console.error(`   ❌ Erro na API da IA (Cliente) - Tentativa ${tentativa}:`, err.message);
+      
+      let tempoEspera = 10000; // Padrão 10s
+      
+      // Tenta extrair o tempo do erro do Gemini (ex: "Please retry in 25.460834771s")
+      const match = err.message.match(/retry in ([\d\.]+)s/);
+      if (match && match[1]) {
+        tempoEspera = Math.ceil(parseFloat(match[1])) * 1000 + 1000; // Tempo do erro + 1s de margem
+      } else if (err.message.includes('429') || err.message.includes('Too Many Requests') || err.message.includes('Quota exceeded')) {
+        tempoEspera = Math.min(10000 * Math.pow(1.5, tentativa - 1), 60000); // Exponencial até 60s
+      } else {
+        tempoEspera = 5000;
+      }
+
+      console.log(`   ⏳ Aguardando ${tempoEspera / 1000}s para tentar novamente...`);
+      await new Promise(resolve => setTimeout(resolve, tempoEspera));
+      tentativa++;
     }
-
-    // Limpa a formatação de negrito e asteriscos indesejados
-    reply = reply.replace(/\*\*/g, '').replace(/\*/g, '');
-
-  } catch (err) {
-    console.error('   ❌ Erro na API da IA (Cliente):', err.message);
   }
 
   console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
@@ -200,28 +227,51 @@ async function handleOwnerMessage(msg, text, ctx) {
   console.log('   Tipo: DONO');
 
   const systemPrompt = buildOwnerSystemPrompt(ctx);
-  let rawJson = '{}';
+  let rawJson = '';
+  let sucesso = false;
+  let tentativa = 1;
 
-  try {
-    if (anthropic) {
-      const response = await anthropic.messages.create({
-        model:      'claude-3-haiku-20240307',
-        max_tokens: 300,
-        system:     systemPrompt,
-        messages:   [{ role: 'user', content: text }],
-      });
-      rawJson = response.content?.[0]?.text || '{}';
-    } else if (geminiModel) {
-      const result = await geminiModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text }] }],
-        systemInstruction: systemPrompt
-      });
-      rawJson = result.response.text() || '{}';
+  while (!sucesso) {
+    try {
+      if (anthropic) {
+        const response = await anthropic.messages.create({
+          model:      'claude-3-haiku-20240307',
+          max_tokens: 300,
+          system:     systemPrompt,
+          messages:   [{ role: 'user', content: text }],
+        });
+        rawJson = response.content?.[0]?.text || '';
+      } else if (geminiModel) {
+        const result = await geminiModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text }] }],
+          systemInstruction: systemPrompt
+        });
+        rawJson = result.response.text() || '';
+      }
+
+      if (rawJson) {
+         sucesso = true;
+      } else {
+         rawJson = '{}';
+         sucesso = true;
+      }
+    } catch (err) {
+      console.error(`   ❌ Erro na API da IA (Dono) - Tentativa ${tentativa}:`, err.message);
+      
+      let tempoEspera = 10000;
+      const match = err.message.match(/retry in ([\d\.]+)s/);
+      if (match && match[1]) {
+        tempoEspera = Math.ceil(parseFloat(match[1])) * 1000 + 1000;
+      } else if (err.message.includes('429') || err.message.includes('Too Many Requests') || err.message.includes('Quota exceeded')) {
+        tempoEspera = Math.min(10000 * Math.pow(1.5, tentativa - 1), 60000);
+      } else {
+        tempoEspera = 5000;
+      }
+
+      console.log(`   ⏳ Aguardando ${tempoEspera / 1000}s para tentar novamente...`);
+      await new Promise(resolve => setTimeout(resolve, tempoEspera));
+      tentativa++;
     }
-  } catch (err) {
-    console.error('   ❌ Erro na API da IA (Dono):', err.message);
-    await msg.reply('⚠️ Falha ao processar comando com a IA.');
-    return;
   }
 
   console.log('   JSON da IA:', rawJson);
