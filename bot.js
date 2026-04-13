@@ -50,7 +50,7 @@ if (ANTHROPIC_KEY) {
   console.log('🧠 IA Ativa: Anthropic Claude');
 } else if (GEMINI_API_KEY) {
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
   console.log('🧠 IA Ativa: Google Gemini');
 }
 
