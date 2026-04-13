@@ -50,6 +50,10 @@ if (!anthropic && !genAI) {
 // ─────────────────────────────────────────
 const client = new Client({
   authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
+  // Previne o erro "Execution context was destroyed" desativando o cache local da página
+  webVersionCache: { 
+    type: 'none' 
+  },
   puppeteer: {
     headless: true,
     args: [
@@ -174,14 +178,9 @@ async function handleClientMessage(msg, text, ctx) {
   if (!reply && genAI) {
     try {
       console.log('   🔄 Processando com Google Gemini (Fallback)...');
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: systemPrompt 
-      });
-      const result = await model.generateContent(text);
-      reply = result.response.text();
+      reply = await callGeminiWithRetry(text, systemPrompt);
     } catch (err) {
-      console.error('   ❌ Erro no Google Gemini:', err.message);
+      console.error('   ❌ Erro final no Google Gemini:', err.message);
     }
   }
 
@@ -222,14 +221,9 @@ async function handleOwnerMessage(msg, text, ctx) {
   if (!rawJson && genAI) {
     try {
       console.log('   🔄 Processando comando com Google Gemini (Fallback)...');
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        systemInstruction: systemPrompt 
-      });
-      const result = await model.generateContent(text);
-      rawJson = result.response.text();
+      rawJson = await callGeminiWithRetry(text, systemPrompt);
     } catch (err) {
-      console.error('   ❌ Erro no Google Gemini:', err.message);
+      console.error('   ❌ Erro final no Google Gemini:', err.message);
     }
   }
 
@@ -301,8 +295,33 @@ async function executeCommand(cmd, ctx) {
 }
 
 // ─────────────────────────────────────────
-// HELPERS DE API
+// HELPERS DE API E IA
 // ─────────────────────────────────────────
+
+// Helper para retentar o Gemini automaticamente caso a API esteja sobrecarregada (Erro 503)
+async function callGeminiWithRetry(text, systemPrompt) {
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    try {
+      const model = genAI.getGenerativeModel({ 
+        model: "gemini-2.5-flash",
+        systemInstruction: systemPrompt 
+      });
+      const result = await model.generateContent(text);
+      return result.response.text();
+    } catch (err) {
+      // Se for erro 503 e ainda tivermos tentativas sobrando, nós esperamos e tentamos de novo
+      if (err.message && err.message.includes('503') && tentativa < 3) {
+        const tempoEspera = tentativa * 2000; // Aguarda 2s na primeira falha, 4s na segunda
+        console.log(`   ⏳ Gemini com alta demanda (503). Retentando em ${tempoEspera / 1000}s (Tentativa ${tentativa + 1}/3)...`);
+        await new Promise(r => setTimeout(r, tempoEspera));
+      } else {
+        // Se não for 503 ou se já esgotou as tentativas, joga o erro para frente
+        throw err;
+      }
+    }
+  }
+}
+
 async function fetchContext() {
   try {
     const res = await fetch(`${API_BASE}/api/context`);
