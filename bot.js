@@ -1,8 +1,8 @@
 /**
  * bot.js — RotaHair WhatsApp Bot
- * whatsapp-web.js + Anthropic Claude API
+ * whatsapp-web.js + Anthropic Claude API ou Google Gemini API
  *
- * DEPENDÊNCIA NOVA: npm install qrcode
+ * DEPENDÊNCIA NOVA: npm install qrcode @google/generative-ai
  */
 
 'use strict';
@@ -12,8 +12,11 @@ require('dotenv').config();
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCode         = require('qrcode');          // <-- NOVO: gera data URL para o painel web
-const Anthropic      = require('@anthropic-ai/sdk');
 const fetch          = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+
+// APIs de IA
+const Anthropic = require('@anthropic-ai/sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const { buildClientPrompt, buildOwnerSystemPrompt } = require('./prompts');
 
@@ -25,16 +28,31 @@ const NOME_DONO    = process.env.NOME_DONO || 'Rodrigo';
 const NUMERO_TESTE = process.env.NUMERO_TESTE;
 const API_BASE     = process.env.API_BASE_URL || 'http://localhost:8000';
 
+const ANTHROPIC_KEY  = process.env.ANTHROPIC_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
 if (!NUMERO_DONO) {
   console.error('❌ NUMERO_DONO não definido no .env');
   process.exit(1);
 }
-if (!process.env.ANTHROPIC_KEY) {
-  console.error('❌ ANTHROPIC_KEY não definida no .env');
+
+if (!ANTHROPIC_KEY && !GEMINI_API_KEY) {
+  console.error('❌ Nenhuma chave de API definida! Preencha ANTHROPIC_KEY ou GEMINI_API_KEY no .env');
   process.exit(1);
 }
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_KEY });
+let anthropic;
+let geminiModel;
+
+// Inicializa o cliente correto baseado na chave disponível
+if (ANTHROPIC_KEY) {
+  anthropic = new Anthropic({ apiKey: ANTHROPIC_KEY });
+  console.log('🧠 IA Ativa: Anthropic Claude');
+} else if (GEMINI_API_KEY) {
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  console.log('🧠 IA Ativa: Google Gemini');
+}
 
 // ─────────────────────────────────────────
 // WHATSAPP CLIENT
@@ -145,15 +163,32 @@ async function handleClientMessage(msg, text, ctx) {
   console.log('   Tipo: CLIENTE');
 
   const systemPrompt = buildClientPrompt(ctx);
+  let reply = 'Desculpe, não consegui processar sua mensagem.';
 
-  const response = await anthropic.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 600,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: text }],
-  });
+  try {
+    if (anthropic) {
+      const response = await anthropic.messages.create({
+        model:      'claude-3-haiku-20240307',
+        max_tokens: 600,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: text }],
+      });
+      reply = response.content?.[0]?.text || reply;
+    } else if (geminiModel) {
+      const result = await geminiModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text }] }],
+        systemInstruction: systemPrompt
+      });
+      reply = result.response.text() || reply;
+    }
 
-  const reply = response.content?.[0]?.text || 'Desculpe, não consegui processar sua mensagem.';
+    // Limpa a formatação de negrito e asteriscos indesejados
+    reply = reply.replace(/\*\*/g, '').replace(/\*/g, '');
+
+  } catch (err) {
+    console.error('   ❌ Erro na API da IA (Cliente):', err.message);
+  }
+
   console.log(`   Resposta: "${reply.substring(0, 80)}..."`);
   await msg.reply(reply);
 }
@@ -165,16 +200,31 @@ async function handleOwnerMessage(msg, text, ctx) {
   console.log('   Tipo: DONO');
 
   const systemPrompt = buildOwnerSystemPrompt(ctx);
+  let rawJson = '{}';
 
-  const response = await anthropic.messages.create({
-    model:      'claude-sonnet-4-20250514',
-    max_tokens: 300,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: text }],
-  });
+  try {
+    if (anthropic) {
+      const response = await anthropic.messages.create({
+        model:      'claude-3-haiku-20240307',
+        max_tokens: 300,
+        system:     systemPrompt,
+        messages:   [{ role: 'user', content: text }],
+      });
+      rawJson = response.content?.[0]?.text || '{}';
+    } else if (geminiModel) {
+      const result = await geminiModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text }] }],
+        systemInstruction: systemPrompt
+      });
+      rawJson = result.response.text() || '{}';
+    }
+  } catch (err) {
+    console.error('   ❌ Erro na API da IA (Dono):', err.message);
+    await msg.reply('⚠️ Falha ao processar comando com a IA.');
+    return;
+  }
 
-  const rawJson = response.content?.[0]?.text || '{}';
-  console.log('   JSON do Claude:', rawJson);
+  console.log('   JSON da IA:', rawJson);
 
   let cmd;
   try {
