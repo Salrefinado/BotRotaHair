@@ -5,7 +5,6 @@ color 0A
 :: ══════════════════════════════════════════════════
 ::   PREENCHA SEUS DADOS AQUI (so uma vez)
 :: ══════════════════════════════════════════════════
-
 set "NUMERO_DONO="
 set "NOME_DONO=Rodrigo"
 set "NUMERO_TESTE="
