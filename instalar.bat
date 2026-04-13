@@ -10,6 +10,7 @@ set "NUMERO_DONO="
 set "NOME_DONO=Rodrigo"
 set "NUMERO_TESTE="
 set "ANTHROPIC_KEY="
+set "GEMINI_API_KEY="
 set "GOOGLE_CLIENT_ID="
 set "GOOGLE_CLIENT_SECRET="
 set "ADMIN_EMAIL="
@@ -26,7 +27,6 @@ echo ==========================================
 echo    Instalador do Sistema RotaHair
 echo ==========================================
 echo.
-
 :: ── Verifica conexao com internet ─────────────────
 ping -n 1 github.com >nul 2>&1
 if %errorlevel% neq 0 (
@@ -56,6 +56,14 @@ if %errorlevel% neq 0 (
 
 tar -xf rotahair.zip
 del /q rotahair.zip
+
+:: ── Trava de seguranca para evitar execucao na raiz ──
+if not exist "BotRotaHair-main" (
+    echo [ERRO] A pasta BotRotaHair-main nao foi encontrada apos a extracao!
+    echo O download falhou ou o repositorio Salrefinado/BotRotaHair esta privado.
+    pause
+    exit /b 1
+)
 cd BotRotaHair-main
 
 echo [OK] Projeto baixado em: %CD%
@@ -68,6 +76,7 @@ echo [2/6] Configurando credenciais...
     echo NOME_DONO=%NOME_DONO%
     echo NUMERO_TESTE=%NUMERO_TESTE%
     echo ANTHROPIC_KEY=%ANTHROPIC_KEY%
+    echo GEMINI_API_KEY=%GEMINI_API_KEY%
     echo GOOGLE_CLIENT_ID=%GOOGLE_CLIENT_ID%
     echo GOOGLE_CLIENT_SECRET=%GOOGLE_CLIENT_SECRET%
     echo ADMIN_EMAIL=%ADMIN_EMAIL%
@@ -103,8 +112,11 @@ if %errorlevel% neq 0 (
 
 where ngrok >nul 2>&1
 if %errorlevel% neq 0 (
-    echo     Instalando Ngrok...
-    winget install --id ngrok.ngrok -e --source winget --accept-package-agreements --accept-source-agreements
+    echo     Baixando Ngrok direto do servidor oficial...
+    curl -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip >nul 2>&1
+    tar -xf ngrok.zip
+    del ngrok.zip
+    echo     [OK] Ngrok baixado na pasta.
 ) else (
     echo     [OK] Ngrok ja esta instalado.
 )
@@ -135,7 +147,11 @@ for /f "delims=" %%i in ('powershell -NoProfile -Command "[Environment]::GetFold
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Iniciar.lnk');$s.TargetPath='%CD%\iniciar.bat';$s.WorkingDirectory='%CD%';$s.Save()"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -COM WScript.Shell).CreateShortcut('%DESK%\RotaHair - Desligar.lnk');$s.TargetPath='%CD%\desligar.bat';$s.WorkingDirectory='%CD%';$s.Save()"
 
-ngrok config add-authtoken %NGROK_AUTHTOKEN% > nul 2>&1
+if exist ngrok.exe (
+    ngrok config add-authtoken %NGROK_AUTHTOKEN% > nul 2>&1
+) else (
+    call ngrok config add-authtoken %NGROK_AUTHTOKEN% > nul 2>&1
+)
 echo [OK] Atalhos criados. Ngrok autenticado.
 
 :: ── Inicia o sistema ──────────────────────────────
@@ -144,7 +160,6 @@ echo ==========================================
 echo    Instalacao concluida! Iniciando...
 echo ==========================================
 echo.
-
 echo Iniciando API Python (minimizado)...
 start "RotaHair - API" /min cmd /k "call "%CD%\venv\Scripts\activate" && python "%CD%\api.py""
 timeout /t 4 /nobreak > nul
@@ -154,7 +169,11 @@ start "RotaHair - Bot | QR Code aqui" cmd /k "cd /d "%CD%" && node bot.js"
 timeout /t 2 /nobreak > nul
 
 echo Iniciando tunel Ngrok (minimizado)...
-start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=%NGROK_DOMAIN% 8000"
+if exist ngrok.exe (
+    start "RotaHair - Ngrok" /min cmd /k "ngrok.exe http --domain=%NGROK_DOMAIN% 8000"
+) else (
+    start "RotaHair - Ngrok" /min cmd /k "ngrok http --domain=%NGROK_DOMAIN% 8000"
+)
 timeout /t 4 /nobreak > nul
 
 echo Abrindo painel web...
