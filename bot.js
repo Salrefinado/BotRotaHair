@@ -151,7 +151,7 @@ async function handleClientMessage(msg, text, ctx) {
 
   try {
     const response = await anthropic.messages.create({
-      model:      'claude-sonnet-4-20250514',
+      model:      'claude-haiku-4-5-20251001',
       max_tokens: 600,
       system:     systemPrompt,
       messages:   [{ role: 'user', content: text }],
@@ -181,7 +181,7 @@ async function handleOwnerMessage(msg, text, ctx) {
   let rawJson;
   try {
     const response = await anthropic.messages.create({
-      model:      'claude-sonnet-4-20250514',
+      model:      'claude-haiku-4-5-20251001',
       max_tokens: 300,
       system:     systemPrompt,
       messages:   [{ role: 'user', content: text }],
